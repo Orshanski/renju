@@ -1,0 +1,36 @@
+# OS
+.DS_Store
+*.swp
+
+# Engine — external Rapfi: sources and machine-specific artifacts live locally,
+# not in git (rebuilt per host). build.sh / config.toml / runbook DO go in git.
+/engine/rapfi/
+/engine/bin/
+/engine/weights/
+/engine/*.bin
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Node / frontend
+node_modules/
+dist/
+frontend/dist/
+
+# SQLite (local dev DB)
+*.sqlite
+*.sqlite3
+*.db
+*.db-wal
+*.db-shm
+
+# Secrets / local env
+.env
+.env.*
+!.env.example

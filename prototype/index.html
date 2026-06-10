@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>連珠 · Renju</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600;700;800&family=Zen+Kaku+Gothic+New:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --washi:#ece2cf; --washi-2:#e3d7bd;
+  --paper:#f4ecda; --paper-soft:#efe5cf;
+  --sumi:#241d16; --sumi-soft:#5b4f42; --sumi-faint:#8a7c69;
+  --wood-1:#dcb583; --wood-2:#cf9f68; --wood-edge:#a06f3f;
+  --line:rgba(42,30,18,.5);
+  --vermillion:#bd3326; --vermillion-deep:#9c2519;
+  --indigo:#27415f; --indigo-soft:#3a5777;
+  --gold:#a9823f;
+  --ok:#3f7a4e;
+  --r:14px;
+  --shadow:0 18px 40px -18px rgba(40,28,14,.55);
+  --shadow-sm:0 6px 18px -10px rgba(40,28,14,.5);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:"Zen Kaku Gothic New",sans-serif;
+  color:var(--sumi);
+  background:
+    radial-gradient(1200px 700px at 80% -10%, #f6efdf 0%, rgba(246,239,223,0) 60%),
+    radial-gradient(900px 600px at -10% 110%, #e8dcc2 0%, rgba(232,220,194,0) 55%),
+    var(--washi);
+  position:relative; min-height:100%;
+  -webkit-font-smoothing:antialiased;
+}
+/* washi grain */
+body::before{
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:1; opacity:.5;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
+  mix-blend-mode:multiply;
+}
+.serif{font-family:"Shippori Mincho",serif}
+
+/* ---------- App chrome ---------- */
+.app{position:relative; z-index:2; min-height:100vh; display:flex; flex-direction:column}
+header.bar{
+  display:flex; align-items:center; gap:28px;
+  padding:18px 34px; border-bottom:1px solid rgba(60,45,25,.16);
+  background:linear-gradient(#f4ecdb,#efe5cf);
+}
+.brand{display:flex; align-items:baseline; gap:12px; cursor:pointer}
+.brand .kanji{font-family:"Shippori Mincho",serif; font-weight:800; font-size:30px; letter-spacing:2px; color:var(--sumi)}
+.brand .lat{font-family:"Shippori Mincho",serif; font-weight:600; letter-spacing:7px; font-size:13px; text-transform:uppercase; color:var(--sumi-soft); transform:translateY(-3px)}
+nav.tabs{display:flex; gap:6px; margin-left:8px}
+nav.tabs button{
+  font-family:"Zen Kaku Gothic New"; font-weight:500; font-size:14px; letter-spacing:.5px;
+  background:none; border:none; color:var(--sumi-soft); padding:9px 16px; border-radius:10px; cursor:pointer;
+  transition:.18s;
+}
+nav.tabs button:hover{background:rgba(60,45,25,.07); color:var(--sumi)}
+nav.tabs button.active{background:var(--sumi); color:var(--paper)}
+.spacer{flex:1}
+.userchip{display:flex; align-items:center; gap:10px; color:var(--sumi-soft); font-size:14px}
+.userchip .av{width:30px;height:30px;border-radius:50%;background:radial-gradient(circle at 32% 30%,#4d4842,#1c1813); color:#f0e9d8; display:grid;place-items:center; font-family:"Shippori Mincho"; font-size:13px}
+.linkbtn{background:none;border:none;color:var(--sumi-faint);cursor:pointer;font-size:13px;letter-spacing:.4px}
+.linkbtn:hover{color:var(--vermillion)}
+
+main{flex:1; padding:38px 34px 60px}
+.screen{display:none; animation:rise .5s cubic-bezier(.2,.7,.2,1) both}
+.screen.show{display:block}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.wrap{max-width:1120px;margin:0 auto}
+.eyebrow{font-family:"Shippori Mincho";font-weight:600;letter-spacing:5px;text-transform:uppercase;font-size:11px;color:var(--vermillion);display:flex;align-items:center;gap:10px}
+.eyebrow::before{content:"";width:26px;height:1px;background:var(--vermillion);display:inline-block}
+h1.title{font-family:"Shippori Mincho";font-weight:800;font-size:40px;line-height:1.05;margin:14px 0 6px;letter-spacing:-.5px}
+.sub{color:var(--sumi-soft);font-size:15px;font-weight:300}
+
+/* ---------- Hanko seal ---------- */
+.hanko{width:54px;height:54px;border-radius:9px;background:var(--vermillion);color:#fbeee6;
+  font-family:"Shippori Mincho";font-weight:800;font-size:22px;display:grid;place-items:center;
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.25), 0 6px 14px -8px rgba(150,30,20,.7);
+  position:relative}
+.hanko::after{content:"";position:absolute;inset:5px;border:1px solid rgba(255,255,255,.35);border-radius:5px}
+
+/* ---------- LOGIN ---------- */
+#screen-login{display:none;animation:none}
+#screen-login.show{display:grid}
+.login-stage{
+  position:fixed; top:0; right:0; bottom:0; left:0; z-index:3;
+  display:grid; grid-template-columns:1.15fr .85fr;
+}
+.login-art{
+  position:relative; overflow:hidden;
+  background:
+    radial-gradient(700px 480px at 30% 25%, #e8c79a 0%, rgba(232,199,154,0) 60%),
+    linear-gradient(150deg,#caa06a,#b07f49 60%,#8f6336);
+  display:flex; flex-direction:column; justify-content:center; gap:34px; padding:54px;
+}
+.login-art > .hanko{position:absolute; top:46px; left:54px; margin:0; z-index:2}
+.login-art .big{font-family:"Shippori Mincho";font-weight:800;color:#3a2a16;line-height:.92}
+.login-art .big .k{font-size:148px;letter-spacing:8px;display:block;line-height:1;text-shadow:0 2px 0 rgba(255,255,255,.12)}
+.login-art .big .l{display:block;font-size:26px;letter-spacing:14px;text-transform:uppercase;margin-top:22px;color:#48341b}
+.login-art .poem{font-family:"Shippori Mincho";font-style:italic;color:#4b371d;font-size:18px;max-width:360px;line-height:1.7;opacity:.92}
+.login-art .grid-deco{position:absolute;right:-60px;bottom:-60px;width:320px;height:320px;opacity:.22;
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:32px 32px;transform:rotate(8deg)}
+.login-form{display:flex;flex-direction:column;justify-content:center;padding:0 9%;background:linear-gradient(#f4ecda,#ece1c9)}
+.login-form .hanko{margin-bottom:26px}
+.field{margin:14px 0}
+.field label{display:block;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--sumi-soft);margin-bottom:7px}
+.field input{
+  width:100%;padding:14px 16px;border-radius:11px;border:1px solid rgba(60,45,25,.22);
+  background:#fbf6ea;font-family:"Zen Kaku Gothic New";font-size:15px;color:var(--sumi);transition:.18s;
+}
+.field input:focus{outline:none;border-color:var(--indigo);box-shadow:0 0 0 3px rgba(39,65,95,.14);background:#fff}
+.btn{
+  font-family:"Zen Kaku Gothic New";font-weight:500;font-size:15px;letter-spacing:.5px;cursor:pointer;border:none;border-radius:11px;padding:14px 22px;transition:.18s;
+}
+.btn-primary{background:var(--sumi);color:var(--paper);box-shadow:var(--shadow-sm)}
+.btn-primary:hover{background:#000;transform:translateY(-1px)}
+.btn-vermillion{background:var(--vermillion);color:#fbeee6}
+.btn-vermillion:hover{background:var(--vermillion-deep);transform:translateY(-1px)}
+.btn-ghost{background:transparent;border:1px solid rgba(60,45,25,.25);color:var(--sumi)}
+.btn-ghost:hover{background:rgba(60,45,25,.06)}
+.btn-block{width:100%;margin-top:8px}
+
+/* ---------- GAMES LIST ---------- */
+.list-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-bottom:30px}
+.games{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px}
+.gcard{
+  background:linear-gradient(#f6eedd,#efe4cd);border:1px solid rgba(60,45,25,.14);border-radius:var(--r);
+  padding:20px;cursor:pointer;transition:.2s;position:relative;overflow:hidden;box-shadow:var(--shadow-sm)
+}
+.gcard:hover{transform:translateY(-3px);box-shadow:var(--shadow);border-color:rgba(60,45,25,.28)}
+.gcard .mini{width:100%;aspect-ratio:1;border-radius:9px;margin-bottom:14px;
+  background:url("assets/board_pine.jpg") center/cover;position:relative;overflow:hidden;
+  box-shadow:inset 0 0 0 1px rgba(120,80,40,.3)}
+.gcard .mini::before{content:"";position:absolute;inset:9px;
+  background-image:linear-gradient(var(--line) .5px,transparent .5px),linear-gradient(90deg,var(--line) .5px,transparent .5px);
+  background-size:calc((100% - 0px)/8) calc((100% - 0px)/8)}
+.gcard .gm-row{display:flex;align-items:center;justify-content:space-between}
+.gcard h3{font-family:"Shippori Mincho";font-weight:700;font-size:18px}
+.gcard .meta{font-size:13px;color:var(--sumi-soft);margin-top:3px;display:flex;gap:8px;align-items:center}
+.dot{width:5px;height:5px;border-radius:50%;background:var(--sumi-faint)}
+.tag{font-size:11px;letter-spacing:1px;text-transform:uppercase;padding:4px 9px;border-radius:20px;font-weight:500}
+.tag.go{background:rgba(63,122,78,.16);color:var(--ok)}
+.tag.think{background:rgba(189,51,38,.14);color:var(--vermillion)}
+.tag.done{background:rgba(60,45,25,.1);color:var(--sumi-soft)}
+.stone-chip{width:18px;height:18px;border-radius:50%;display:inline-block;vertical-align:middle}
+.sc-black{background:radial-gradient(circle at 33% 28%,#56514b,#16130f)}
+.sc-white{background:radial-gradient(circle at 33% 28%,#fdfbf6,#cfc8b8);box-shadow:inset 0 0 0 1px rgba(120,100,70,.3)}
+.newcard{display:grid;place-items:center;border:1.5px dashed rgba(60,45,25,.3);background:transparent;min-height:230px}
+.newcard:hover{border-color:var(--vermillion);background:rgba(189,51,38,.04)}
+.newcard .plus{font-family:"Shippori Mincho";font-size:40px;color:var(--sumi-soft);line-height:1}
+.newcard .txt{margin-top:8px;color:var(--sumi-soft);font-size:14px;letter-spacing:.5px}
+
+/* ---------- GAME ---------- */
+.game-layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:34px;align-items:start}
+.board-shell{display:flex;justify-content:center}
+.goban{
+  --n:15; --step:38px; --pad:30px;
+  width:calc(var(--step) * (var(--n) - 1) + var(--pad)*2);
+  height:calc(var(--step) * (var(--n) - 1) + var(--pad)*2);
+  position:relative; border-radius:8px;
+  background:
+    linear-gradient(160deg, rgba(255,250,238,.10), rgba(214,182,134,.08)),
+    url("assets/board_pine.jpg");
+  background-size:cover; background-position:center;
+  box-shadow:var(--shadow), inset 0 0 0 2px rgba(150,110,60,.38), inset 0 2px 12px rgba(255,248,230,.45);
+}
+.goban::after{ /* depth vignette over real wood */
+  content:"";position:absolute;inset:0;border-radius:8px;pointer-events:none;
+  background:radial-gradient(125% 125% at 30% 18%, rgba(255,250,232,.18), rgba(120,80,40,0) 52%, rgba(120,82,38,.07));
+}
+.grid-lines{position:absolute;inset:var(--pad);
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:var(--step) var(--step);
+  background-position:0 0;
+}
+.grid-lines{width:calc(var(--step)*(var(--n)-1)+1px);height:calc(var(--step)*(var(--n)-1)+1px)}
+.node{position:absolute;width:var(--step);height:var(--step);transform:translate(-50%,-50%);border-radius:50%;cursor:pointer;display:grid;place-items:center;z-index:3}
+.node .hit{width:70%;height:70%;border-radius:50%}
+.node:hover .ghost{opacity:.5}
+.ghost{position:absolute;width:30px;height:30px;border-radius:50%;opacity:0;transition:.12s;pointer-events:none}
+.stone{position:absolute;width:32px;height:32px;border-radius:50%;transform:translate(-50%,-50%);z-index:4;
+  animation:place .25s cubic-bezier(.2,.8,.2,1) both}
+@keyframes place{from{transform:translate(-50%,-50%) scale(.4);opacity:0}to{transform:translate(-50%,-50%) scale(1);opacity:1}}
+.black{background:radial-gradient(circle at 34% 28%,#5a554e 0%,#211d18 55%,#0d0b09 100%);box-shadow:0 4px 7px -2px rgba(20,12,4,.6),inset 0 -3px 6px rgba(0,0,0,.5),inset 0 2px 3px rgba(255,255,255,.18)}
+.white{background:radial-gradient(circle at 34% 28%,#ffffff 0%,#f2ede1 50%,#cbc2af 100%);box-shadow:0 4px 7px -2px rgba(20,12,4,.4),inset 0 -3px 6px rgba(120,100,70,.25),inset 0 2px 3px rgba(255,255,255,.8)}
+.hoshi{position:absolute;width:7px;height:7px;border-radius:50%;background:rgba(40,28,14,.7);transform:translate(-50%,-50%);z-index:2}
+.last{position:absolute;width:10px;height:10px;border-radius:50%;transform:translate(-50%,-50%);z-index:5;pointer-events:none}
+.last.on-black{background:#e9dcc4} .last.on-white{background:var(--vermillion)}
+.forbid{position:absolute;transform:translate(-50%,-50%);z-index:5;color:var(--vermillion);font-weight:700;font-family:"Shippori Mincho";font-size:22px;pointer-events:none;text-shadow:0 1px 1px rgba(255,240,220,.6)}
+
+/* side panel */
+.panel{display:flex;flex-direction:column;gap:18px}
+.card{background:linear-gradient(#f6eedd,#efe4cd);border:1px solid rgba(60,45,25,.14);border-radius:var(--r);padding:20px;box-shadow:var(--shadow-sm)}
+.turn{display:flex;align-items:center;gap:14px}
+.turn .who{display:flex;align-items:center;gap:10px;font-family:"Shippori Mincho";font-weight:700;font-size:17px}
+.bigstone{width:30px;height:30px;border-radius:50%}
+.thinking{display:flex;align-items:center;gap:9px;color:var(--vermillion);font-size:14px;margin-top:12px;font-weight:500}
+.thinking .d{width:7px;height:7px;border-radius:50%;background:var(--vermillion);animation:bnc 1s infinite ease-in-out}
+.thinking .d:nth-child(2){animation-delay:.15s}.thinking .d:nth-child(3){animation-delay:.3s}
+@keyframes bnc{0%,80%,100%{transform:scale(.5);opacity:.4}40%{transform:scale(1);opacity:1}}
+.kv{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px dashed rgba(60,45,25,.16);font-size:14px}
+.kv:last-child{border-bottom:none}
+.kv .k{color:var(--sumi-soft)}
+.kv .v{font-weight:500}
+.level-pill{font-family:"Shippori Mincho";font-weight:700;color:var(--indigo)}
+.controls{display:flex;gap:10px}
+.controls .btn{flex:1;padding:12px}
+.movelog{max-height:150px;overflow:auto;font-size:13px;color:var(--sumi-soft);line-height:1.9;font-variant-numeric:tabular-nums}
+.movelog b{color:var(--sumi)}
+
+/* ---------- SETTINGS ---------- */
+.settings{max-width:680px}
+.setrow{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:20px 0;border-bottom:1px solid rgba(60,45,25,.14)}
+.setrow .label{font-family:"Shippori Mincho";font-weight:600;font-size:16px}
+.setrow .desc{color:var(--sumi-soft);font-size:13.5px;font-weight:300;margin-top:3px;max-width:420px}
+.toggle{width:52px;height:30px;border-radius:30px;background:rgba(60,45,25,.22);position:relative;cursor:pointer;transition:.2s;flex-shrink:0}
+.toggle::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fbf6ea;transition:.2s;box-shadow:0 2px 4px rgba(0,0,0,.2)}
+.toggle.on{background:var(--ok)}
+.toggle.on::after{left:25px}
+.stepper{display:flex;align-items:center;gap:0;border:1px solid rgba(60,45,25,.25);border-radius:10px;overflow:hidden}
+.stepper button{width:40px;height:40px;border:none;background:#f3e9d4;font-size:18px;cursor:pointer;color:var(--sumi)}
+.stepper button:hover{background:#ecdfc4}
+.stepper .num{width:64px;text-align:center;font-weight:600;font-variant-numeric:tabular-nums}
+.stepper.dim{opacity:.4;pointer-events:none}
+
+/* ---------- ADMIN ---------- */
+.admin-tabs{display:flex;gap:4px;margin-bottom:24px;border-bottom:1px solid rgba(60,45,25,.16)}
+.admin-tabs button{background:none;border:none;padding:12px 18px;font-family:"Zen Kaku Gothic New";font-size:14px;color:var(--sumi-soft);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.admin-tabs button.active{color:var(--sumi);border-bottom-color:var(--vermillion);font-weight:500}
+.atab{display:none}.atab.show{display:block;animation:rise .35s both}
+table.tbl{width:100%;border-collapse:collapse;font-size:14px}
+table.tbl th{text-align:left;font-family:"Shippori Mincho";font-weight:600;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--sumi-soft);padding:12px 14px;border-bottom:1px solid rgba(60,45,25,.18)}
+table.tbl td{padding:13px 14px;border-bottom:1px solid rgba(60,45,25,.1)}
+table.tbl tr:hover td{background:rgba(60,45,25,.04)}
+.role{font-size:11px;letter-spacing:.8px;text-transform:uppercase;padding:3px 9px;border-radius:20px;font-weight:600}
+.role.admin{background:rgba(39,65,95,.16);color:var(--indigo)}
+.role.user{background:rgba(60,45,25,.1);color:var(--sumi-soft)}
+.iconbtn{background:none;border:1px solid rgba(60,45,25,.2);border-radius:8px;padding:6px 11px;font-size:12.5px;cursor:pointer;color:var(--sumi-soft);margin-right:6px}
+.iconbtn:hover{border-color:var(--vermillion);color:var(--vermillion)}
+.health{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
+.hcard{padding:20px;border-radius:var(--r);border:1px solid rgba(60,45,25,.14);background:linear-gradient(#f6eedd,#efe4cd)}
+.hcard .lbl{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--sumi-soft)}
+.hcard .val{font-family:"Shippori Mincho";font-weight:700;font-size:26px;margin-top:8px;display:flex;align-items:center;gap:9px}
+.pulse{width:9px;height:9px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 0 rgba(63,122,78,.5);animation:pl 1.6s infinite}
+@keyframes pl{0%{box-shadow:0 0 0 0 rgba(63,122,78,.5)}70%{box-shadow:0 0 0 9px rgba(63,122,78,0)}100%{box-shadow:0 0 0 0 rgba(63,122,78,0)}}
+.engcfg{display:grid;gap:18px;max-width:520px}
+
+/* ---------- MODAL ---------- */
+.modal-bg{position:fixed;inset:0;z-index:20;background:rgba(35,25,12,.5);backdrop-filter:blur(3px);display:none;place-items:center;animation:fade .2s both}
+.modal-bg.show{display:grid}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.modal{width:min(560px,92vw);background:linear-gradient(#f5edda,#ece1c8);border-radius:18px;padding:34px;box-shadow:0 40px 80px -30px rgba(20,12,4,.7);border:1px solid rgba(120,90,50,.3);animation:pop .3s cubic-bezier(.2,.8,.2,1) both}
+@keyframes pop{from{opacity:0;transform:scale(.94) translateY(10px)}to{opacity:1;transform:none}}
+.levels{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin:22px 0}
+.lvl{padding:14px 8px;border-radius:12px;border:1px solid rgba(60,45,25,.2);background:#fbf6ea;cursor:pointer;text-align:center;transition:.16s}
+.lvl:hover{border-color:var(--indigo)}
+.lvl.sel{background:var(--indigo);color:#f1ead9;border-color:var(--indigo);transform:translateY(-2px);box-shadow:var(--shadow-sm)}
+.lvl .lk{font-family:"Shippori Mincho";font-size:20px;font-weight:700}
+.lvl .ln{font-size:11px;margin-top:5px;letter-spacing:.5px}
+.dice{display:flex;align-items:center;gap:10px;background:rgba(189,51,38,.08);border:1px dashed rgba(189,51,38,.35);border-radius:11px;padding:12px 14px;color:var(--vermillion-deep);font-size:13.5px}
+.modal h2{font-family:"Shippori Mincho";font-weight:800;font-size:24px}
+.modal .mclose{float:right;cursor:pointer;color:var(--sumi-faint);font-size:22px;line-height:1}
+
+.attr{position:fixed;bottom:6px;right:11px;z-index:30;font-size:10px;letter-spacing:.4px;opacity:.4;color:var(--sumi-soft)}
+.attr a{color:inherit;text-decoration:none}
+.attr:hover{opacity:.75}
+@media(max-width:900px){
+  .game-layout{grid-template-columns:1fr}
+  .login-stage{grid-template-columns:1fr}
+  .login-art{display:none}
+  .levels{grid-template-columns:repeat(3,1fr)}
+}
+</style>
+</head>
+<body>
+<!-- Board texture: "Seamless pine wood texture" by Vecteezy. Visible attribution below: Wood Stock photos by Vecteezy (https://www.vecteezy.com/free-photos/wood) -->
+
+<!-- ===== LOGIN (own full stage) ===== -->
+<section id="screen-login" class="screen show">
+  <div class="login-stage">
+    <div class="login-art">
+      <div class="hanko">連</div>
+      <div class="big"><span class="k">連珠</span><span class="l">Renju</span></div>
+      <div class="poem"><span style="display:block;font-style:normal;font-size:27px;line-height:1.55;letter-spacing:1px">斧の柄の<br>いくたび朽ちて<br>日永哉</span><span style="display:block;margin-top:18px;font-size:13.5px;letter-spacing:.5px;opacity:.82">Рукоять топора<br>истлела —<br>смотрю на игру</span><span style="display:block;margin-top:12px;font-size:11px;letter-spacing:2px;opacity:.6;font-style:normal">正岡子規 · 1895</span></div>
+      <div class="grid-deco"></div>
+    </div>
+    <div class="login-form">
+      <div class="hanko">入</div>
+      <h1 class="title serif" style="font-size:30px">С возвращением</h1>
+      <p class="sub" style="margin-bottom:18px">Войдите, чтобы продолжить партию</p>
+      <div class="field"><label>Имя</label><input type="text" value="alexey" autocomplete="username"></div>
+      <div class="field"><label>Пароль</label><input type="password" value="········" autocomplete="current-password"></div>
+      <button class="btn btn-primary btn-block" onclick="enter()">Войти</button>
+      <p style="margin-top:18px;font-size:13px;color:var(--sumi-faint)">Регистрации нет — пользователей заводит администратор.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== APP ===== -->
+<div class="app" id="app" style="display:none">
+  <header class="bar">
+    <div class="brand" onclick="go('games')">
+      <span class="kanji">連珠</span><span class="lat">Renju</span>
+    </div>
+    <nav class="tabs">
+      <button data-tab="games" class="active" onclick="go('games')">Партии</button>
+      <button data-tab="game" onclick="go('game')">Игра</button>
+      <button data-tab="settings" onclick="go('settings')">Настройки</button>
+      <button data-tab="admin" onclick="go('admin')">Админ</button>
+    </nav>
+    <div class="spacer"></div>
+    <div class="userchip"><span class="av">A</span><span>alexey</span><button class="linkbtn" onclick="logout()">выйти</button></div>
+  </header>
+
+  <main>
+    <!-- GAMES -->
+    <section id="screen-games" class="screen wrap">
+      <div class="list-head">
+        <div>
+          <div class="eyebrow">Твои партии</div>
+          <h1 class="title">Доска ждёт</h1>
+          <p class="sub">Продолжай с любого устройства — партия живёт на сервере.</p>
+        </div>
+        <button class="btn btn-vermillion" onclick="openNew()">＋ Новая партия</button>
+      </div>
+      <div class="games">
+        <div class="gcard" onclick="go('game')">
+          <div class="mini"></div>
+          <div class="gm-row"><h3>Партия №47</h3><span class="tag think">ход за тобой</span></div>
+          <div class="meta"><span class="stone-chip sc-black"></span> ты — чёрные <span class="dot"></span> <span class="level-pill">Сильный</span></div>
+          <div class="meta" style="margin-top:6px">ход 24 <span class="dot"></span> обновлено 2 мин назад</div>
+        </div>
+        <div class="gcard" onclick="go('game')">
+          <div class="mini"></div>
+          <div class="gm-row"><h3>Партия №46</h3><span class="tag go">соперник думает</span></div>
+          <div class="meta"><span class="stone-chip sc-white"></span> ты — белые <span class="dot"></span> <span class="level-pill">Мастер</span></div>
+          <div class="meta" style="margin-top:6px">ход 12 <span class="dot"></span> обновлено вчера</div>
+        </div>
+        <div class="gcard" onclick="go('game')">
+          <div class="mini"></div>
+          <div class="gm-row"><h3>Партия №45</h3><span class="tag done">победа белых</span></div>
+          <div class="meta"><span class="stone-chip sc-black"></span> ты — чёрные <span class="dot"></span> <span class="level-pill">Уверенный</span></div>
+          <div class="meta" style="margin-top:6px">пятёрка на ходу 38 <span class="dot"></span> 3 дня назад</div>
+        </div>
+        <div class="gcard newcard" onclick="openNew()">
+          <div class="plus">＋</div><div class="txt">начать новую</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- GAME -->
+    <section id="screen-game" class="screen wrap">
+      <div class="eyebrow" style="margin-bottom:18px">Партия №47 · ты играешь чёрными</div>
+      <div class="game-layout">
+        <div class="board-shell">
+          <div class="goban" id="goban">
+            <div class="grid-lines"></div>
+            <!-- nodes / stones injected by JS -->
+          </div>
+        </div>
+        <aside class="panel">
+          <div class="card">
+            <div class="turn">
+              <span class="bigstone black"></span>
+              <div class="who">Твой ход</div>
+            </div>
+            <div class="thinking" id="thinkingRow" style="display:none">
+              <span class="d"></span><span class="d"></span><span class="d"></span> соперник думает…
+            </div>
+          </div>
+          <div class="card">
+            <div class="kv"><span class="k">Уровень</span><span class="v level-pill">Сильный</span></div>
+            <div class="kv"><span class="k">Твой цвет</span><span class="v">чёрные ⚫</span></div>
+            <div class="kv"><span class="k">Ход</span><span class="v">№24</span></div>
+            <div class="kv"><span class="k">Запрещённые</span><span class="v" style="color:var(--vermillion)">подсвечены ✕</span></div>
+          </div>
+          <div class="controls">
+            <button class="btn btn-ghost" onclick="undo()">↶ Отменить</button>
+            <button class="btn btn-ghost" onclick="toggleThink()">⧗ Демо «думает»</button>
+          </div>
+          <div class="card">
+            <div class="eyebrow" style="margin-bottom:10px">Лог ходов</div>
+            <div class="movelog" id="movelog"></div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="screen-settings" class="screen wrap">
+      <div class="eyebrow">Профиль</div>
+      <h1 class="title">Настройки</h1>
+      <p class="sub" style="margin-bottom:10px">Глобально для всех твоих партий.</p>
+      <div class="settings">
+        <div class="setrow">
+          <div><div class="label">Отмена ходов (undo)</div><div class="desc">Разрешить откатывать ходы во время игры.</div></div>
+          <div class="toggle on" onclick="this.classList.toggle('on');syncUndo(this)"></div>
+        </div>
+        <div class="setrow" id="rowLimit">
+          <div><div class="label">Лимит откатов</div><div class="desc">Сколько раз за партию можно отменить ход. ∞ — без ограничений.</div></div>
+          <div class="stepper" id="limitStepper">
+            <button onclick="limit(-1)">−</button><div class="num" id="limitNum">∞</div><button onclick="limit(1)">＋</button>
+          </div>
+        </div>
+        <div class="setrow" id="rowEnd">
+          <div><div class="label">Откат после конца партии</div><div class="desc">Позволить вернуться в игру из завершённой партии и переиграть концовку.</div></div>
+          <div class="toggle" onclick="this.classList.toggle('on')"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ADMIN -->
+    <section id="screen-admin" class="screen wrap">
+      <div class="eyebrow">Администрирование</div>
+      <h1 class="title">Управление</h1>
+      <div class="admin-tabs">
+        <button class="active" onclick="atab('users',this)">Пользователи</button>
+        <button onclick="atab('games',this)">Партии</button>
+        <button onclick="atab('engine',this)">Движок</button>
+        <button onclick="atab('health',this)">Состояние</button>
+      </div>
+
+      <div id="atab-users" class="atab show">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:14px"><button class="btn btn-vermillion" style="padding:10px 16px">＋ Завести пользователя</button></div>
+        <table class="tbl">
+          <thead><tr><th>Имя</th><th>Роль</th><th>Создан</th><th style="text-align:right">Действия</th></tr></thead>
+          <tbody>
+            <tr><td>alexey</td><td><span class="role admin">admin</span></td><td>07.06.2026</td><td style="text-align:right"><button class="iconbtn">сброс пароля</button><button class="iconbtn">роль</button></td></tr>
+            <tr><td>guest</td><td><span class="role user">user</span></td><td>07.06.2026</td><td style="text-align:right"><button class="iconbtn">сброс пароля</button><button class="iconbtn">роль</button><button class="iconbtn">удалить</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div id="atab-games" class="atab">
+        <table class="tbl">
+          <thead><tr><th>№</th><th>Владелец</th><th>Статус</th><th>Ход</th><th style="text-align:right"></th></tr></thead>
+          <tbody>
+            <tr><td>47</td><td>alexey</td><td><span class="tag think" style="display:inline-block">ход игрока</span></td><td>24</td><td style="text-align:right"><button class="iconbtn">открыть</button><button class="iconbtn">удалить</button></td></tr>
+            <tr><td>46</td><td>alexey</td><td><span class="tag go" style="display:inline-block">движок думает</span></td><td>12</td><td style="text-align:right"><button class="iconbtn">открыть</button><button class="iconbtn">удалить</button></td></tr>
+            <tr><td>45</td><td>guest</td><td><span class="tag done" style="display:inline-block">завершена</span></td><td>38</td><td style="text-align:right"><button class="iconbtn">открыть</button><button class="iconbtn">удалить</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div id="atab-engine" class="atab">
+        <div class="engcfg">
+          <div class="setrow" style="padding-top:0"><div><div class="label">Уровень по умолчанию</div><div class="desc">С каким уровнем создаётся новая партия.</div></div><span class="level-pill">Уверенный</span></div>
+          <div class="setrow"><div><div class="label">Нейросеть (NNUE)</div><div class="desc">Полная сила движка. Выключить — режим-fallback на слабом CPU.</div></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+          <div class="setrow"><div><div class="label">Время на ход (мастер)</div><div class="desc">Верхний предел раздумий для высшего уровня.</div></div><span class="v" style="font-weight:600">5.0 с</span></div>
+        </div>
+      </div>
+
+      <div id="atab-health" class="atab">
+        <div class="health">
+          <div class="hcard"><div class="lbl">Движок Rapfi</div><div class="val"><span class="pulse"></span>жив</div></div>
+          <div class="hcard"><div class="lbl">Версия</div><div class="val">v0.9 · NNUE</div></div>
+          <div class="hcard"><div class="lbl">Активных партий</div><div class="val">2</div></div>
+          <div class="hcard"><div class="lbl">Память</div><div class="val">318 МБ</div></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ===== NEW GAME MODAL ===== -->
+<div class="modal-bg" id="newModal">
+  <div class="modal">
+    <span class="mclose" onclick="closeNew()">✕</span>
+    <div class="eyebrow">Новая партия</div>
+    <h2 class="serif">Выбери соперника</h2>
+    <div class="levels" id="levels">
+      <div class="lvl" data-l="novice" onclick="selLvl(this)"><div class="lk">初</div><div class="ln">Новичок</div></div>
+      <div class="lvl" data-l="amateur" onclick="selLvl(this)"><div class="lk">二</div><div class="ln">Любитель</div></div>
+      <div class="lvl sel" data-l="confident" onclick="selLvl(this)"><div class="lk">三</div><div class="ln">Уверенный</div></div>
+      <div class="lvl" data-l="strong" onclick="selLvl(this)"><div class="lk">四</div><div class="ln">Сильный</div></div>
+      <div class="lvl" data-l="master" onclick="selLvl(this)"><div class="lk">名</div><div class="ln">Мастер</div></div>
+    </div>
+    <div class="dice">🎲 Цвет определится случайно — выпадут белые, первый ход сделает движок.</div>
+    <button class="btn btn-primary btn-block" style="margin-top:22px" onclick="startGame()">Начать партию</button>
+  </div>
+</div>
+
+<div class="attr"><a href="https://www.vecteezy.com/free-photos/wood" target="_blank" rel="noopener">Wood Stock photos by Vecteezy</a></div>
+
+<script>
+const N=15;
+let stones=[]; // {x,y,c}
+let nextColor='black';
+
+function go(tab){
+  document.querySelectorAll('.app .screen').forEach(s=>s.classList.remove('show'));
+  document.getElementById('screen-'+tab).classList.add('show');
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+  if(tab==='game') buildBoard();
+}
+function enter(){ document.getElementById('screen-login').classList.remove('show'); document.getElementById('app').style.display='flex'; go('games'); }
+function logout(){ document.getElementById('app').style.display='none'; document.getElementById('screen-login').classList.add('show'); }
+
+// ---- board ----
+const HOSHI=[[3,3],[11,3],[3,11],[11,11],[7,7]];
+const FORBID=[[5,8],[9,6]]; // demo: запрещённые точки для чёрных
+function demoPosition(){
+  return [
+    {x:7,y:7,c:'black'},{x:8,y:8,c:'white'},{x:8,y:6,c:'black'},{x:6,y:8,c:'white'},
+    {x:9,y:7,c:'black'},{x:6,y:6,c:'white'},{x:7,y:9,c:'black'},{x:9,y:9,c:'white'},
+    {x:7,y:5,c:'black'},{x:5,y:7,c:'white'}
+  ];
+}
+function buildBoard(){
+  const g=document.getElementById('goban');
+  g.querySelectorAll('.node,.stone,.hoshi,.last,.forbid').forEach(e=>e.remove());
+  stones = demoPosition();
+  nextColor='black';
+  const step=38, pad=30;
+  const pos=i=>pad+i*step+'px';
+  // hoshi
+  HOSHI.forEach(([x,y])=>{const d=document.createElement('div');d.className='hoshi';d.style.left=pos(x);d.style.top=pos(y);g.appendChild(d);});
+  // clickable nodes
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++){
+    const n=document.createElement('div');n.className='node';n.style.left=pos(x);n.style.top=pos(y);
+    const ghost=document.createElement('div');ghost.className='ghost';
+    ghost.style.background='radial-gradient(circle at 34% 28%,#5a554e,#15110d)';
+    n.appendChild(ghost);
+    n.onclick=()=>placeAt(x,y);
+    n.onmouseenter=()=>{ghost.style.background = nextColor==='black'
+      ? 'radial-gradient(circle at 34% 28%,#5a554e,#15110d)'
+      : 'radial-gradient(circle at 34% 28%,#fff,#cfc8b8)';};
+    g.appendChild(n);
+  }
+  // forbidden markers
+  FORBID.forEach(([x,y])=>{const f=document.createElement('div');f.className='forbid';f.textContent='✕';f.style.left=pos(x);f.style.top=pos(y);g.appendChild(f);});
+  redraw();
+}
+function redraw(){
+  const g=document.getElementById('goban');const step=38,pad=30;const pos=i=>pad+i*step+'px';
+  g.querySelectorAll('.stone,.last').forEach(e=>e.remove());
+  stones.forEach((s,i)=>{
+    const el=document.createElement('div');el.className='stone '+s.c;el.style.left=pos(s.x);el.style.top=pos(s.y);g.appendChild(el);
+    if(i===stones.length-1){const m=document.createElement('div');m.className='last '+(s.c==='black'?'on-black':'on-white');m.style.left=pos(s.x);m.style.top=pos(s.y);g.appendChild(m);}
+  });
+  nextColor = stones.length%2===0 ? 'black':'white';
+  // log
+  const log=document.getElementById('movelog');
+  if(log){log.innerHTML=stones.map((s,i)=>`<div>${i+1}. <b>${s.c==='black'?'⚫':'⚪'}</b> ${String.fromCharCode(65+s.x)}${s.y+1}</div>`).reverse().join('');}
+}
+function placeAt(x,y){
+  if(stones.some(s=>s.x===x&&s.y===y))return;            // занято
+  if(nextColor==='black'&&FORBID.some(f=>f[0]===x&&f[1]===y))return; // фол — не ставим
+  stones.push({x,y,c:nextColor});
+  redraw();
+}
+function undo(){ if(stones.length>1){stones.pop();redraw();} }
+function toggleThink(){ const t=document.getElementById('thinkingRow'); t.style.display = t.style.display==='none'?'flex':'none'; }
+
+// ---- settings ----
+let lim=Infinity;
+function limit(d){ if(lim===Infinity){lim = d>0?Infinity:10;} else {lim=Math.max(0,lim+d);} if(lim>10)lim=Infinity; document.getElementById('limitNum').textContent = lim===Infinity?'∞':lim; }
+function syncUndo(t){ const on=t.classList.contains('on'); document.getElementById('limitStepper').classList.toggle('dim',!on); document.getElementById('rowEnd').style.opacity=on?1:.4; }
+
+// ---- admin ----
+function atab(name,btn){ document.querySelectorAll('.atab').forEach(a=>a.classList.remove('show')); document.getElementById('atab-'+name).classList.add('show'); document.querySelectorAll('.admin-tabs button').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); }
+
+// ---- modal ----
+function openNew(){ document.getElementById('newModal').classList.add('show'); }
+function closeNew(){ document.getElementById('newModal').classList.remove('show'); }
+function selLvl(el){ document.querySelectorAll('.lvl').forEach(l=>l.classList.remove('sel')); el.classList.add('sel'); }
+function startGame(){ closeNew(); go('game'); }
+document.getElementById('newModal').addEventListener('click',e=>{if(e.target.id==='newModal')closeNew();});
+</script>
+</body>
+</html>
