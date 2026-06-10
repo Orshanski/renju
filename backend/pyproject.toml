@@ -1,0 +1,33 @@
+[project]
+name = "renju-backend"
+version = "0.1.0"
+description = "Renju web app backend"
+requires-python = ">=3.13"
+dependencies = [
+    "pydantic>=2.7",
+    "pydantic-settings>=2.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.2",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.4",
+]
+
+[tool.uv]
+# Виртуальный проект: само приложение как пакет не собираем и не ставим,
+# uv управляет только зависимостями. Импорты работают через pytest pythonpath.
+package = false
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+pythonpath = ["."]  # чтобы `import app` / `import scripts` работали из тестов
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
