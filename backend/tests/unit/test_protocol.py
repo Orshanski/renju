@@ -1,6 +1,14 @@
 import pytest
 
-from app.rapfi.protocol import LineKind, ProtocolError, parse_line
+from app.domain.levels import EngineParams
+from app.rapfi.protocol import (
+    LineKind,
+    ProtocolError,
+    forbid_commands,
+    init_commands,
+    parse_line,
+    position_commands,
+)
 
 
 def test_parse_ok():
@@ -60,3 +68,52 @@ def test_parse_forbid_empty():
 def test_parse_forbid_malformed_is_protocol_error():
     with pytest.raises(ProtocolError):
         parse_line("FORBID 077.")  # нечётное число цифр — битая склейка
+
+
+def test_init_commands():
+    params = EngineParams(strength=55, timeout_turn_ms=2500)
+    assert init_commands(params) == [
+        "START 15",
+        "INFO rule 4",
+        "INFO strength 55",
+        "INFO timeout_turn 2500",
+    ]
+
+
+def test_position_commands_empty_board_is_begin():
+    assert position_commands([]) == ["BEGIN"]
+
+
+def test_position_commands_engine_moves_second():
+    # человек-чёрный сходил (7,7); очередь движка (белые): who=2 у чужого камня
+    assert position_commands([(7, 7)]) == ["BOARD", "7,7,2", "DONE"]
+
+
+def test_position_commands_engine_is_black():
+    # движок-чёрный (7,7) who=1, человек-белый (8,8) who=2
+    assert position_commands([(7, 7), (8, 8)]) == ["BOARD", "7,7,1", "8,8,2", "DONE"]
+
+
+def test_forbid_commands():
+    assert forbid_commands([(8, 7), (0, 0)]) == [
+        "YXBOARD",
+        "8,7,1",
+        "0,0,2",
+        "DONE",
+        "YXSHOWFORBID",
+    ]
+
+
+def test_position_commands_rejects_non_int_coordinates():
+    for bad in [(7.0, 7), ("7", 7), (7, None), (True, 3)]:
+        with pytest.raises(ProtocolError):
+            position_commands([bad])  # type: ignore[list-item]
+
+
+def test_position_commands_rejects_out_of_board_and_duplicates():
+    with pytest.raises(ProtocolError):
+        position_commands([(15, 0)])
+    with pytest.raises(ProtocolError):
+        position_commands([(-1, 3)])
+    with pytest.raises(ProtocolError):
+        position_commands([(7, 7), (7, 7)])

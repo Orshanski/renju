@@ -8,9 +8,11 @@
 """
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
+from app.domain.levels import EngineParams
 from app.domain.values import BOARD_SIZE, Point
 
 _MOVE_RE = re.compile(r"^(\d{1,2}),(\d{1,2})$")
@@ -65,3 +67,58 @@ def parse_line(raw: str) -> ParsedLine:
 
 def _on_board(point: Point) -> bool:
     return 0 <= point[0] < BOARD_SIZE and 0 <= point[1] < BOARD_SIZE
+
+
+def init_commands(params: EngineParams) -> list[str]:
+    """Переинициализация перед каждым расчётом — состояние партий не протекает."""
+    return [
+        f"START {BOARD_SIZE}",
+        "INFO rule 4",
+        f"INFO strength {params.strength}",
+        f"INFO timeout_turn {params.timeout_turn_ms}",
+    ]
+
+
+def position_commands(moves: Sequence[Point]) -> list[str]:
+    """BOARD-блок для запроса хода (пустая позиция — BEGIN).
+
+    who относительно стороны-на-ходу: 1 — её камни, 2 — соперника.
+    Камни в порядке ходов (первый — чёрный)."""
+    _validate_moves(moves)
+    if not moves:
+        return ["BEGIN"]
+    return ["BOARD", *_stone_lines(moves), "DONE"]
+
+
+def forbid_commands(moves: Sequence[Point]) -> list[str]:
+    """YXBOARD-блок (ставит доску без расчёта) + запрос запрещённых точек."""
+    _validate_moves(moves)
+    return ["YXBOARD", *_stone_lines(moves), "DONE", "YXSHOWFORBID"]
+
+
+def _stone_lines(moves: Sequence[Point]) -> list[str]:
+    side_to_move_parity = len(moves) % 2
+    return [
+        f"{x},{y},{1 if i % 2 == side_to_move_parity else 2}"
+        for i, (x, y) in enumerate(moves)
+    ]
+
+
+def _validate_moves(moves: Sequence[Point]) -> None:
+    """Анти-инъекция (спек §5.2): в stdin движка уходят только int 0..14.
+
+    bool — подкласс int, отвергаем явно. Дубликаты — битая позиция."""
+    seen: set[Point] = set()
+    for point in moves:
+        if not (isinstance(point, tuple) and len(point) == 2):
+            raise ProtocolError(f"malformed point: {point!r}")
+        x, y = point
+        if isinstance(x, bool) or isinstance(y, bool):
+            raise ProtocolError(f"non-int coordinates: {point!r}")
+        if not (isinstance(x, int) and isinstance(y, int)):
+            raise ProtocolError(f"non-int coordinates: {point!r}")
+        if not _on_board((x, y)):
+            raise ProtocolError(f"point out of board: {point!r}")
+        if (x, y) in seen:
+            raise ProtocolError(f"duplicate point: {point!r}")
+        seen.add((x, y))
