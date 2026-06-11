@@ -90,7 +90,7 @@ async def game_loop(level: LevelInfo) -> None:
                 return
             if raw.strip().lower() == "u":
                 try:
-                    moves = undo_truncate(moves=moves, human_color=human)
+                    moves = undo_truncate(moves=moves, for_color=human)
                 except DomainError as e:
                     print(f"Undo нельзя: {e}")
                 continue
