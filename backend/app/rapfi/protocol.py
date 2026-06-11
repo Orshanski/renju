@@ -56,8 +56,7 @@ def parse_line(raw: str) -> ParsedLine:
             raise ProtocolError(f"malformed FORBID line: {line!r}")
         digits = m.group(1)
         points = tuple(
-            (int(digits[i : i + 2]), int(digits[i + 2 : i + 4]))
-            for i in range(0, len(digits), 4)
+            (int(digits[i : i + 2]), int(digits[i + 2 : i + 4])) for i in range(0, len(digits), 4)
         )
         if not all(_on_board(p) for p in points):
             raise ProtocolError(f"forbid point out of board: {line!r}")
@@ -98,10 +97,7 @@ def forbid_commands(moves: Sequence[Point]) -> list[str]:
 
 def _stone_lines(moves: Sequence[Point]) -> list[str]:
     side_to_move_parity = len(moves) % 2
-    return [
-        f"{x},{y},{1 if i % 2 == side_to_move_parity else 2}"
-        for i, (x, y) in enumerate(moves)
-    ]
+    return [f"{x},{y},{1 if i % 2 == side_to_move_parity else 2}" for i, (x, y) in enumerate(moves)]
 
 
 def _validate_moves(moves: Sequence[Point]) -> None:

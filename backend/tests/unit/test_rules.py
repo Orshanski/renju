@@ -68,10 +68,8 @@ def test_full_board_without_five_is_draw():
     # 4 направлений (горизонталь BBWW…, вертикаль BWBW…, диагонали BWWB…).
     # NB: раскраска 2×2-блоками (x//2+y//2)%2 НЕ подходит — на главной
     # диагонали (k,k) она даёт один цвет на все 15 клеток.
-    blacks = [(x, y) for y in range(BOARD_SIZE) for x in range(BOARD_SIZE)
-              if (x + 2 * y) % 4 < 2]
-    whites = [(x, y) for y in range(BOARD_SIZE) for x in range(BOARD_SIZE)
-              if (x + 2 * y) % 4 >= 2]
+    blacks = [(x, y) for y in range(BOARD_SIZE) for x in range(BOARD_SIZE) if (x + 2 * y) % 4 < 2]
+    whites = [(x, y) for y in range(BOARD_SIZE) for x in range(BOARD_SIZE) if (x + 2 * y) % 4 >= 2]
     assert len(blacks) == 113 and len(whites) == 112  # чёрные ходят первыми
     moves = interleave(blacks, whites)
     assert len(moves) == MAX_MOVES

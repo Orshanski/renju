@@ -76,9 +76,7 @@ async def game_loop(level: Level) -> None:
                     return
                 continue
 
-            forbidden = (
-                await adapter.forbidden_points(moves) if human is Color.BLACK else []
-            )
+            forbidden = await adapter.forbidden_points(moves) if human is Color.BLACK else []
             print(render_board(moves=moves, forbidden=forbidden))
             raw = input("Твой ход (h8 / u / q): ")
             if raw.strip().lower() == "q":
@@ -116,9 +114,7 @@ async def game_loop(level: Level) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Партия против Rapfi в терминале")
-    parser.add_argument(
-        "--level", choices=[lv.value for lv in Level], default=Level.MEDIUM.value
-    )
+    parser.add_argument("--level", choices=[lv.value for lv in Level], default=Level.MEDIUM.value)
     args = parser.parse_args()
     asyncio.run(game_loop(Level(args.level)))
 

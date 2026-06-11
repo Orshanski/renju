@@ -20,7 +20,7 @@ def test_color_of_move_alternates_from_black():
 
 
 def test_color_to_move_by_move_count():
-    assert color_to_move(0) is Color.BLACK   # пустая доска — ходят чёрные
+    assert color_to_move(0) is Color.BLACK  # пустая доска — ходят чёрные
     assert color_to_move(1) is Color.WHITE
     assert color_to_move(8) is Color.BLACK
 

@@ -25,7 +25,6 @@ class Settings(BaseSettings):
         )
         if not candidates:
             raise FileNotFoundError(
-                "pbrain-rapfi не найден: собери движок (engine/build.sh) "
-                "или укажи RENJU_RAPFI_BIN"
+                "pbrain-rapfi не найден: собери движок (engine/build.sh) или укажи RENJU_RAPFI_BIN"
             )
         return candidates[0]
