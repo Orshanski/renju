@@ -16,6 +16,7 @@ from app.domain.values import Point
 from app.rapfi.process import EngineProcessDied, RapfiProcess
 from app.rapfi.protocol import (
     LineKind,
+    ParsedLine,
     ProtocolError,
     forbid_commands,
     init_commands,
@@ -58,7 +59,8 @@ class RapfiAdapter:
         timeout = params.timeout_turn_ms / 1000 + self._wall_clock_slack_s
         async with self._lock:
             parsed = await self._request(commands, LineKind.MOVE, timeout)
-        assert parsed.move is not None
+        if parsed.move is None:
+            raise EngineError("engine returned no move")
         if parsed.move in set(moves):
             raise EngineError(f"engine returned occupied cell: {parsed.move}")
         return parsed.move
@@ -70,7 +72,8 @@ class RapfiAdapter:
         commands = init_commands(_FORBID_PARAMS) + forbid_commands(moves)
         async with self._lock:
             parsed = await self._request(commands, LineKind.FORBID, _FORBID_TIMEOUT_S)
-        assert parsed.forbidden is not None
+        if parsed.forbidden is None:
+            raise EngineError("engine returned no forbidden list")
         return list(parsed.forbidden)
 
     async def close(self) -> None:
@@ -81,7 +84,7 @@ class RapfiAdapter:
 
     # --- внутреннее -----------------------------------------------------
 
-    async def _request(self, commands: list[str], want: LineKind, timeout_s: float):
+    async def _request(self, commands: list[str], want: LineKind, timeout_s: float) -> ParsedLine:
         """Одна попытка + один повтор на свежем процессе. Вызывать под self._lock."""
         try:
             return await self._attempt(commands, want, timeout_s)
@@ -93,7 +96,7 @@ class RapfiAdapter:
             await self._kill_proc()
             raise EngineError(f"engine failed twice: {e!r}") from e
 
-    async def _attempt(self, commands: list[str], want: LineKind, timeout_s: float):
+    async def _attempt(self, commands: list[str], want: LineKind, timeout_s: float) -> ParsedLine:
         proc = await self._ensure_proc()
         async with asyncio.timeout(timeout_s):
             await proc.send(commands)

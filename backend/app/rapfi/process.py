@@ -31,9 +31,12 @@ class RapfiProcess:
         return self._proc.returncode is None
 
     async def send(self, lines: list[str]) -> None:
-        assert self._proc.stdin is not None
+        if not lines:
+            return
         if not self.alive:
             raise EngineProcessDied("send to dead engine process")
+        if self._proc.stdin is None:
+            raise EngineProcessDied("engine stdin is not a pipe")
         self._proc.stdin.write(("\n".join(lines) + "\n").encode())
         try:
             await self._proc.stdin.drain()
@@ -41,7 +44,8 @@ class RapfiProcess:
             raise EngineProcessDied(str(e)) from e
 
     async def read_line(self) -> str:
-        assert self._proc.stdout is not None
+        if self._proc.stdout is None:
+            raise EngineProcessDied("engine stdout is not a pipe")
         raw = await self._proc.stdout.readline()
         if not raw:
             raise EngineProcessDied("engine stdout closed (EOF)")
