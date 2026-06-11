@@ -2,17 +2,16 @@
   "pythonVersion": "3.13",
   "venvPath": "backend",
   "venv": ".venv",
-  "typeCheckingMode": "basic",
-  "reportMissingImports": "error",
+  "extraPaths": ["backend"],
+  "include": ["backend/app", "backend/tests", "backend/scripts"],
   "exclude": [
     "**/__pycache__",
     "backend/.venv",
-    "backend/alembic/versions",
+    "backend/alembic",
     "engine",
     "frontend",
     "data"
   ],
-  "executionEnvironments": [
-    { "root": "backend", "extraPaths": ["backend"] }
-  ]
+  "typeCheckingMode": "basic",
+  "reportMissingImports": "error"
 }
