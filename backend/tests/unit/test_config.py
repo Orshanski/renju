@@ -40,3 +40,16 @@ def test_bin_discovery_fails_loudly_when_missing(monkeypatch, tmp_path):
     monkeypatch.delenv("RENJU_RAPFI_BIN", raising=False)
     with pytest.raises(FileNotFoundError):
         Settings().resolved_rapfi_bin()
+
+
+def test_settings_auth_defaults(tmp_path, monkeypatch):
+    monkeypatch.setenv("RENJU_DATA_DIR", str(tmp_path))
+    from app.config import Settings
+
+    s = Settings()
+    assert s.data_dir == tmp_path
+    assert s.resolved_db_path == tmp_path / "db.sqlite"
+    assert s.jwt_algorithm == "HS256"
+    assert s.jwt_expire_hours == 168
+    assert s.cookie_name == "renju_token"
+    assert s.secure_cookie is False

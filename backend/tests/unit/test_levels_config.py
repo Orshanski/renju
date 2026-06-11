@@ -33,7 +33,9 @@ def test_resolve_level_hit_and_miss(tmp_path):
     f = tmp_path / "levels.toml"
     f.write_text(_SAMPLE)
     levels = load_levels(f)
-    assert resolve_level(levels, "hard").name == "Сложный"
+    hit = resolve_level(levels, "hard")
+    assert hit is not None
+    assert hit.name == "Сложный"
     assert resolve_level(levels, "nope") is None
 
 
