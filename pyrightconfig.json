@@ -1,0 +1,18 @@
+{
+  "pythonVersion": "3.13",
+  "venvPath": "backend",
+  "venv": ".venv",
+  "typeCheckingMode": "basic",
+  "reportMissingImports": "error",
+  "exclude": [
+    "**/__pycache__",
+    "backend/.venv",
+    "backend/alembic/versions",
+    "engine",
+    "frontend",
+    "data"
+  ],
+  "executionEnvironments": [
+    { "root": "backend", "extraPaths": ["backend"] }
+  ]
+}
