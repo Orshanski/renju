@@ -12,12 +12,13 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from app.domain.engine_params import EngineParams
-from app.domain.values import Point
+from app.domain.values import BOARD_SIZE, Point
 from app.rapfi.process import EngineProcessDied, RapfiProcess
 from app.rapfi.protocol import (
     LineKind,
     ParsedLine,
     ProtocolError,
+    block_commands,
     forbid_commands,
     init_commands,
     parse_line,
@@ -33,6 +34,34 @@ _FORBID_PARAMS = EngineParams(strength=100, timeout_turn_ms=1000)
 
 class EngineError(Exception):
     """Движок не смог посчитать (после повтора). Несёт текст причины."""
+
+
+def _move_commands(
+    moves: Sequence[Point],
+    params: EngineParams,
+    allowed_zone: frozenset[Point] | None,
+) -> list[str]:
+    """init + (опц. YXBLOCK вне зоны) + позиция + (опц. YXBLOCKRESET хвостом).
+
+    Блок — свободные клетки вне зоны (all − занятые − зона). Парность гарантирует:
+    блок живёт только внутри этого запроса, в памяти движка между запросами ничего
+    не остаётся (START blockMoves не чистит — поэтому снимаем явно)."""
+    if allowed_zone is not None and not allowed_zone:
+        raise ValueError("allowed_zone must be None or non-empty")
+    commands = init_commands(params)
+    if allowed_zone is not None:
+        occupied = set(moves)
+        block = [
+            (x, y)
+            for x in range(BOARD_SIZE)
+            for y in range(BOARD_SIZE)
+            if (x, y) not in allowed_zone and (x, y) not in occupied
+        ]
+        commands += block_commands(block)
+    commands += position_commands(moves)
+    if allowed_zone is not None:
+        commands += ["YXBLOCKRESET"]
+    return commands
 
 
 class RapfiAdapter:
@@ -53,9 +82,15 @@ class RapfiAdapter:
         self._lock = asyncio.Lock()
         self._proc: RapfiProcess | None = None
 
-    async def compute_move(self, moves: Sequence[Point], params: EngineParams) -> Point:
-        """Ход движка для позиции. Позиция — полный список ходов партии."""
-        commands = init_commands(params) + position_commands(moves)
+    async def compute_move(
+        self,
+        moves: Sequence[Point],
+        params: EngineParams,
+        allowed_zone: frozenset[Point] | None = None,
+    ) -> Point:
+        """Ход движка для позиции. allowed_zone (если задан) — много-клеточная зона,
+        вне которой движок блокируется на этот запрос (YXBLOCK … YXBLOCKRESET)."""
+        commands = _move_commands(moves, params, allowed_zone)
         timeout = params.timeout_turn_ms / 1000 + self._wall_clock_slack_s
         async with self._lock:
             parsed = await self._request(commands, LineKind.MOVE, timeout)
