@@ -10,7 +10,8 @@ import random
 import string
 
 from app.config import REPO_ROOT, Settings
-from app.domain.game import undo_truncate, validate_move
+from app.domain.game import undo_truncate
+from app.domain.opening import opening_zone
 from app.domain.rules import outcome_after
 from app.domain.values import (
     BOARD_SIZE,
@@ -19,6 +20,7 @@ from app.domain.values import (
     Point,
     color_to_move,
 )
+from app.game_service import apply_move, engine_move, new_game
 from app.levels_config import LevelInfo, load_levels, resolve_level
 from app.rapfi.adapter import RapfiAdapter
 
@@ -36,12 +38,17 @@ def parse_input(raw: str) -> Point | None:
     return (x, y)
 
 
-def render_board(*, moves: list[Point], forbidden: list[Point]) -> str:
+def render_board(
+    *, moves: list[Point], forbidden: list[Point], zone: frozenset[Point] | None = None
+) -> str:
     stones: dict[Point, str] = {}
     for i, p in enumerate(moves):
         stones[p] = "●" if i % 2 == 0 else "○"
     for p in forbidden:
         stones.setdefault(p, "×")
+    if zone is not None:
+        for p in zone:
+            stones.setdefault(p, "+")  # только свободные клетки зоны
     rows = []
     for y in range(BOARD_SIZE - 1, -1, -1):
         cells = " ".join(stones.get((x, y), "·") for x in range(BOARD_SIZE))
@@ -61,13 +68,13 @@ async def game_loop(level: LevelInfo) -> None:
     human = random.choice([Color.BLACK, Color.WHITE])
     colour = "чёрными ●" if human is Color.BLACK else "белыми ○"
     print(f"Уровень: {level.name}. Ты играешь {colour}.")
-    moves: list[Point] = []
+    moves: list[Point] = new_game()
     try:
         while True:
             if color_to_move(len(moves)) is not human:
                 print("… соперник думает")
-                engine_move = await adapter.compute_move(moves, params)
-                moves.append(engine_move)
+                engine_pt = await engine_move(adapter, moves, params)
+                moves = apply_move(moves, engine_pt, forbidden=[])
                 outcome = outcome_after(moves)
                 if outcome is not None:
                     print(render_board(moves=moves, forbidden=[]))
@@ -76,7 +83,8 @@ async def game_loop(level: LevelInfo) -> None:
                 continue
 
             forbidden = await adapter.forbidden_points(moves) if human is Color.BLACK else []
-            print(render_board(moves=moves, forbidden=forbidden))
+            zone = opening_zone(len(moves))
+            print(render_board(moves=moves, forbidden=forbidden, zone=zone))
             raw = input("Твой ход (h8 / u / q): ")
             if raw.strip().lower() == "q":
                 return
@@ -91,18 +99,13 @@ async def game_loop(level: LevelInfo) -> None:
                 print("Не понял. Пример: h8")
                 continue
             try:
-                validate_move(
-                    moves=moves,
-                    point=point,
-                    forbidden=forbidden,
-                )
+                moves = apply_move(moves, point, forbidden=forbidden)
             except DomainError as e:
                 print(f"Ход отвергнут: {e}")
                 continue
-            moves.append(point)
             outcome = outcome_after(moves)
             if outcome is not None:
-                print(render_board(moves=moves, forbidden=[]))
+                print(render_board(moves=moves, forbidden=forbidden, zone=None))
                 print(f"Партия окончена: {outcome.value}")
                 return
     finally:

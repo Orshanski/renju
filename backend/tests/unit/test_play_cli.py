@@ -16,3 +16,15 @@ def test_parse_input_invalid():
 def test_render_board_smoke():
     out = render_board(moves=[(7, 7), (8, 8)], forbidden=[(0, 0)])
     assert "●" in out and "○" in out and "×" in out
+
+
+def test_render_board_highlights_free_zone_cells():
+    out = render_board(moves=[(7, 7)], forbidden=[], zone=frozenset({(8, 8), (7, 7)}))
+    assert "+" in out  # (8,8) свободна и в зоне → подсветка
+    # занятый центр (7,7) остаётся камнем, не "+"
+    assert "●" in out
+
+
+def test_render_board_no_zone_has_no_plus():
+    out = render_board(moves=[(7, 7), (8, 8)], forbidden=[(0, 0)])
+    assert "+" not in out
