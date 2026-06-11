@@ -71,10 +71,15 @@ async def game_loop(level: LevelInfo) -> None:
     moves: list[Point] = new_game()
     try:
         while True:
-            if color_to_move(len(moves)) is not human:
+            forbidden = await adapter.forbidden_points(moves)  # фолы чёрных; [] когда ход белых
+            human_turn = color_to_move(len(moves)) is human
+            zone = opening_zone(len(moves)) if human_turn else None
+            print(render_board(moves=moves, forbidden=forbidden, zone=zone))
+
+            if not human_turn:
                 print("… соперник думает")
                 engine_pt = await engine_move(adapter, moves, params)
-                moves = apply_move(moves, engine_pt, forbidden=[])
+                moves = apply_move(moves, engine_pt, forbidden=forbidden)
                 outcome = outcome_after(moves)
                 if outcome is not None:
                     print(render_board(moves=moves, forbidden=[]))
@@ -82,15 +87,12 @@ async def game_loop(level: LevelInfo) -> None:
                     return
                 continue
 
-            forbidden = await adapter.forbidden_points(moves) if human is Color.BLACK else []
-            zone = opening_zone(len(moves))
-            print(render_board(moves=moves, forbidden=forbidden, zone=zone))
             raw = input("Твой ход (h8 / u / q): ")
             if raw.strip().lower() == "q":
                 return
             if raw.strip().lower() == "u":
                 try:
-                    moves = undo_truncate(moves=moves, human_color=human)
+                    moves = undo_truncate(moves=moves, for_color=human)
                 except DomainError as e:
                     print(f"Undo нельзя: {e}")
                 continue
@@ -105,7 +107,7 @@ async def game_loop(level: LevelInfo) -> None:
                 continue
             outcome = outcome_after(moves)
             if outcome is not None:
-                print(render_board(moves=moves, forbidden=forbidden, zone=None))
+                print(render_board(moves=moves, forbidden=[]))
                 print(f"Партия окончена: {outcome.value}")
                 return
     finally:

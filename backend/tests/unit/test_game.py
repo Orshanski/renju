@@ -75,35 +75,35 @@ def test_undo_black_human_at_preset_floor_rejected():
     # preset-модель: [center, white] — ход чёрного, но чёрный ещё не делал
     # реального хода (центр — старт). Откат недопустим.
     with pytest.raises(UndoRejected) as e:
-        undo_truncate(moves=[(7, 7), (8, 8)], human_color=Color.BLACK)
+        undo_truncate(moves=[(7, 7), (8, 8)], for_color=Color.BLACK)
     assert e.value.reason is UndoRejectReason.NOTHING_TO_UNDO
 
 
 def test_undo_black_human_after_own_finishing_move_removes_one():
     # партия закончилась ходом чёрного человека (нечётная длина) → убрать один
     moves = [(7, 7), (8, 8), (7, 8)]
-    assert undo_truncate(moves=moves, human_color=Color.BLACK) == [(7, 7), (8, 8)]
+    assert undo_truncate(moves=moves, for_color=Color.BLACK) == [(7, 7), (8, 8)]
 
 
 def test_undo_white_human_removes_engine_and_own_move():
     # белый человек: [B, W, B] → очередь белых после усечения до 1 камня
     moves = [(7, 7), (8, 8), (9, 9)]
-    assert undo_truncate(moves=moves, human_color=Color.WHITE) == [(7, 7)]
+    assert undo_truncate(moves=moves, for_color=Color.WHITE) == [(7, 7)]
 
 
 def test_undo_white_human_after_own_finishing_move_removes_one():
     moves = [(7, 7), (8, 8), (9, 9), (8, 9)]
-    assert undo_truncate(moves=moves, human_color=Color.WHITE) == [(7, 7), (8, 8), (9, 9)]
+    assert undo_truncate(moves=moves, for_color=Color.WHITE) == [(7, 7), (8, 8), (9, 9)]
 
 
 def test_undo_black_human_with_empty_board_rejected():
     with pytest.raises(UndoRejected) as e:
-        undo_truncate(moves=[], human_color=Color.BLACK)
+        undo_truncate(moves=[], for_color=Color.BLACK)
     assert e.value.reason is UndoRejectReason.NOTHING_TO_UNDO
 
 
 def test_undo_white_human_with_only_engine_move_rejected():
     # у белого человека ещё нет своих ходов — откатывать нечего
     with pytest.raises(UndoRejected) as e:
-        undo_truncate(moves=[(7, 7)], human_color=Color.WHITE)
+        undo_truncate(moves=[(7, 7)], for_color=Color.WHITE)
     assert e.value.reason is UndoRejectReason.NOTHING_TO_UNDO
