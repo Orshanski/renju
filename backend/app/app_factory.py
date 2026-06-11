@@ -9,6 +9,7 @@ from app.error_handlers import register_error_handlers
 from app.middleware.csrf import add_csrf_guard
 from app.middleware.refresh import add_refresh
 from app.middleware.security_headers import add_security_headers
+from app.routers import admin as admin_router
 from app.routers import auth as auth_router
 
 
@@ -33,6 +34,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     add_csrf_guard(app)
     add_security_headers(app)
     app.include_router(auth_router.router)
+    app.include_router(admin_router.router)
 
     @app.get("/api/health")
     async def health():
