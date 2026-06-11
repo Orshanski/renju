@@ -28,7 +28,6 @@ def rapfi_paths(settings):
 async def engine(tmp_path, monkeypatch) -> AsyncIterator[AsyncEngine]:
     monkeypatch.setenv("RENJU_DATA_DIR", str(tmp_path))
     import app.models.user  # noqa: F401 — регистрирует таблицу в metadata
-
     from app.config import Settings
     from app.db.base import Base
     from app.db.engine import make_engine
