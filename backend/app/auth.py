@@ -5,9 +5,11 @@ from typing import Any
 
 import bcrypt
 import jwt
+from fastapi import Request
 from sqlalchemy import select, update
 
 from app.config import Settings
+from app.exceptions import ForbiddenError
 
 log = logging.getLogger("renju.auth")
 _INVALID = "Invalid token"
@@ -79,3 +81,38 @@ async def bump_token_epoch(session, user_id: int) -> int | None:
         .values(token_epoch=User.token_epoch + 1)
         .returning(User.token_epoch)
     )
+
+
+def token_needs_refresh(payload: dict, settings: Settings) -> bool:
+    iat = payload.get("iat")
+    if not iat:
+        return False
+    # iat кладётся как datetime, PyJWT декодирует как unix-timestamp
+    issued = datetime.fromtimestamp(iat, tz=UTC)
+    return datetime.now(UTC) - issued > timedelta(hours=settings.jwt_refresh_after_hours)
+
+
+async def get_current_user(request: Request, session, settings: Settings) -> CurrentUser:
+    token = request.cookies.get(settings.cookie_name)
+    if not token:
+        raise AuthError("Not authenticated")
+    try:
+        payload = decode_token(token, settings)
+    except jwt.ExpiredSignatureError:
+        raise AuthError("Token expired") from None
+    except jwt.InvalidTokenError:
+        raise AuthError(_INVALID) from None
+    user = CurrentUser.from_payload(payload)
+    # token_epoch — прямо из БД (без кеша); §4.4
+    db_epoch = await fetch_token_epoch(session, user.user_id)
+    if db_epoch is None or payload.get("tep", 0) != db_epoch:
+        raise AuthError(_INVALID)
+    if token_needs_refresh(payload, settings):
+        request.state.refresh = {"user_id": user.user_id, "role": user.role, "epoch": db_epoch}
+    return user
+
+
+def require_admin(user: CurrentUser) -> CurrentUser:
+    if user.role != "admin":
+        raise ForbiddenError("Admin access required")
+    return user

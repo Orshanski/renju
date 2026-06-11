@@ -47,3 +47,14 @@ def test_current_user_from_payload_ok():
 def test_current_user_from_payload_rejects(bad):
     with pytest.raises(AuthError):
         CurrentUser.from_payload(bad)
+
+
+def test_token_needs_refresh_unix_iat(cfg):
+    from datetime import UTC, datetime, timedelta
+
+    from app.auth import token_needs_refresh
+
+    old = (datetime.now(UTC) - timedelta(hours=200)).timestamp()  # unix-timestamp!
+    assert token_needs_refresh({"iat": old}, cfg) is True
+    fresh = datetime.now(UTC).timestamp()
+    assert token_needs_refresh({"iat": fresh}, cfg) is False
