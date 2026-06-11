@@ -11,7 +11,7 @@ import asyncio
 from collections.abc import Sequence
 from pathlib import Path
 
-from app.domain.levels import EngineParams
+from app.domain.engine_params import EngineParams
 from app.domain.values import Point
 from app.rapfi.process import EngineProcessDied, RapfiProcess
 from app.rapfi.protocol import (

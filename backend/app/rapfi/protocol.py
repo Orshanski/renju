@@ -12,7 +12,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
-from app.domain.levels import EngineParams
+from app.domain.engine_params import EngineParams
 from app.domain.values import BOARD_SIZE, Point
 
 _MOVE_RE = re.compile(r"^(\d{1,2}),(\d{1,2})$")
