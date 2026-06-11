@@ -10,13 +10,12 @@ import random
 import string
 
 from app.config import REPO_ROOT, Settings
-from app.domain.game import undo_truncate, validate_human_move
+from app.domain.game import undo_truncate, validate_move
 from app.domain.rules import outcome_after
 from app.domain.values import (
     BOARD_SIZE,
     Color,
     DomainError,
-    GameStatus,
     Point,
     color_to_move,
 )
@@ -92,10 +91,8 @@ async def game_loop(level: LevelInfo) -> None:
                 print("Не понял. Пример: h8")
                 continue
             try:
-                validate_human_move(
+                validate_move(
                     moves=moves,
-                    human_color=human,
-                    status=GameStatus.AWAITING_HUMAN,
                     point=point,
                     forbidden=forbidden,
                 )

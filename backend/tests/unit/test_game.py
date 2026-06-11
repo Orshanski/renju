@@ -1,9 +1,8 @@
 import pytest
 
-from app.domain.game import undo_truncate, validate_human_move
+from app.domain.game import undo_truncate, validate_move
 from app.domain.values import (
     Color,
-    GameStatus,
     MoveRejected,
     MoveRejectReason,
     UndoRejected,
@@ -11,88 +10,65 @@ from app.domain.values import (
 )
 
 
-def test_valid_first_black_move_passes():
-    validate_human_move(
-        moves=[],
-        human_color=Color.BLACK,
-        status=GameStatus.AWAITING_HUMAN,
-        point=(7, 7),
-        forbidden=[],
-    )  # не бросает
+def test_valid_move_in_5x5_passes():
+    # позиция [center, white]: ход 3 (чёрные), зона 5×5 — (9,9) внутри
+    validate_move(moves=[(7, 7), (8, 8)], point=(9, 9), forbidden=[])  # не бросает
 
 
 def test_out_of_board_rejected():
     for bad in [(-1, 0), (0, -1), (15, 0), (0, 15)]:
         with pytest.raises(MoveRejected) as e:
-            validate_human_move(
-                moves=[],
-                human_color=Color.BLACK,
-                status=GameStatus.AWAITING_HUMAN,
-                point=bad,
-                forbidden=[],
-            )
+            validate_move(moves=[], point=bad, forbidden=[])
         assert e.value.reason is MoveRejectReason.OUT_OF_BOARD
 
 
 def test_occupied_cell_rejected():
     with pytest.raises(MoveRejected) as e:
-        validate_human_move(
-            moves=[(7, 7), (8, 8)],
-            human_color=Color.BLACK,
-            status=GameStatus.AWAITING_HUMAN,
-            point=(8, 8),
-            forbidden=[],
-        )
+        validate_move(moves=[(7, 7), (8, 8)], point=(8, 8), forbidden=[])
     assert e.value.reason is MoveRejectReason.OCCUPIED
 
 
-def test_not_your_turn_rejected_by_color():
-    # один камень на доске — очередь белых; человек играет чёрными
+def test_occupied_center_in_opening_is_occupied_not_opening_violation():
+    # ход 2 (зона 3×3): клик в занятый центр → OCCUPIED раньше, чем проверка зоны
     with pytest.raises(MoveRejected) as e:
-        validate_human_move(
-            moves=[(7, 7)],
-            human_color=Color.BLACK,
-            status=GameStatus.AWAITING_HUMAN,
-            point=(8, 8),
-            forbidden=[],
-        )
-    assert e.value.reason is MoveRejectReason.NOT_YOUR_TURN
+        validate_move(moves=[(7, 7)], point=(7, 7), forbidden=[])
+    assert e.value.reason is MoveRejectReason.OCCUPIED
 
 
-def test_engine_thinking_rejected():
+def test_opening_violation_move_two_outside_3x3():
+    # ход 2 (зона 3×3): (5,7) вне квадрата
     with pytest.raises(MoveRejected) as e:
-        validate_human_move(
-            moves=[(7, 7), (8, 8)],
-            human_color=Color.BLACK,
-            status=GameStatus.ENGINE_THINKING,
-            point=(9, 9),
-            forbidden=[],
-        )
-    assert e.value.reason is MoveRejectReason.NOT_YOUR_TURN
+        validate_move(moves=[(7, 7)], point=(5, 7), forbidden=[])
+    assert e.value.reason is MoveRejectReason.OPENING_VIOLATION
 
 
-def test_finished_game_rejected():
+def test_opening_violation_move_three_outside_5x5():
+    # ход 3 (зона 5×5): (10,7) вне квадрата
     with pytest.raises(MoveRejected) as e:
-        validate_human_move(
-            moves=[(7, 7), (8, 8)],
-            human_color=Color.BLACK,
-            status=GameStatus.FINISHED_WHITE,
-            point=(9, 9),
-            forbidden=[],
-        )
-    assert e.value.reason is MoveRejectReason.GAME_FINISHED
+        validate_move(moves=[(7, 7), (8, 8)], point=(10, 7), forbidden=[])
+    assert e.value.reason is MoveRejectReason.OPENING_VIOLATION
+
+
+def test_inside_3x3_passes():
+    validate_move(moves=[(7, 7)], point=(8, 8), forbidden=[])  # не бросает
 
 
 def test_forbidden_point_rejected_for_black():
+    # len=2 → ход чёрных; (9,9) внутри 5×5, но в forbidden → FORBIDDEN
     with pytest.raises(MoveRejected) as e:
-        validate_human_move(
-            moves=[(7, 7), (8, 8)],
-            human_color=Color.BLACK,
-            status=GameStatus.AWAITING_HUMAN,
-            point=(9, 9),
-            forbidden=[(9, 9)],
-        )
+        validate_move(moves=[(7, 7), (8, 8)], point=(9, 9), forbidden=[(9, 9)])
     assert e.value.reason is MoveRejectReason.FORBIDDEN
+
+
+def test_forbidden_ignored_for_white():
+    # len=1 → ход белых; forbidden к белым не применяется
+    validate_move(moves=[(7, 7)], point=(8, 8), forbidden=[(8, 8)])  # не бросает
+
+
+# rj-8sc — статус-машина этапа 2: проверка очереди снята с доменного правила
+# (validate_move не знает про статус/роль). Вернуть вместе со статус-машиной.
+# def test_not_your_turn_rejected_by_color(): ...
+# def test_engine_thinking_rejected(): ...
 
 
 def test_undo_black_human_removes_engine_and_own_move():
