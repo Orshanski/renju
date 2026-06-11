@@ -4,12 +4,18 @@ version = "0.1.0"
 description = "Renju web app backend"
 requires-python = ">=3.13"
 dependencies = [
+    "aiosqlite>=0.22.1",
+    "alembic>=1.18.4",
+    "bcrypt>=5.0.0",
     "pydantic>=2.7",
     "pydantic-settings>=2.2",
+    "pyjwt>=2.13.0",
+    "sqlalchemy>=2.0.50",
 ]
 
 [dependency-groups]
 dev = [
+    "httpx>=0.28.1",
     "pytest>=8.2",
     "pytest-asyncio>=0.24",
     "ruff>=0.4",
