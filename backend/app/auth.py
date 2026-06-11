@@ -5,6 +5,7 @@ from typing import Any
 
 import bcrypt
 import jwt
+from sqlalchemy import select, update
 
 from app.config import Settings
 
@@ -60,3 +61,21 @@ class CurrentUser:
             log.warning("JWT malformed: role")
             raise AuthError(_INVALID)
         return cls(user_id=uid, role=role)
+
+
+async def fetch_token_epoch(session, user_id: int) -> int | None:
+    from app.models.user import User
+
+    return await session.scalar(select(User.token_epoch).where(User.id == user_id))
+
+
+async def bump_token_epoch(session, user_id: int) -> int | None:
+    """UPDATE … RETURNING; новый epoch или None если строки нет (guard на гонку reset×delete)."""
+    from app.models.user import User
+
+    return await session.scalar(
+        update(User)
+        .where(User.id == user_id)
+        .values(token_epoch=User.token_epoch + 1)
+        .returning(User.token_epoch)
+    )
