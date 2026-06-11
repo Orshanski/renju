@@ -46,3 +46,30 @@ async def session(engine) -> AsyncIterator[AsyncSession]:
     sm = make_sessionmaker(engine)
     async with sm() as s:
         yield s
+
+
+@pytest_asyncio.fixture
+async def app(tmp_path, monkeypatch):
+    monkeypatch.setenv("RENJU_DATA_DIR", str(tmp_path))
+    import app.models.user  # noqa: F401
+    from app.app_factory import create_app
+    from app.config import Settings
+    from app.db.base import Base
+
+    application = create_app(Settings())
+    async with application.router.lifespan_context(application):  # поднимает engine/sessionmaker
+        async with application.state.engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        yield application
+
+
+@pytest_asyncio.fixture
+async def client(app):
+    from httpx import ASGITransport, AsyncClient
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://t",
+        headers={"X-Requested-With": "XMLHttpRequest"},
+    ) as c:
+        yield c
