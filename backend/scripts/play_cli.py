@@ -11,7 +11,6 @@ import string
 
 from app.config import REPO_ROOT, Settings
 from app.domain.game import undo_truncate, validate_human_move
-from app.domain.levels import LEVELS, Level
 from app.domain.rules import outcome_after
 from app.domain.values import (
     BOARD_SIZE,
@@ -21,6 +20,7 @@ from app.domain.values import (
     Point,
     color_to_move,
 )
+from app.levels_config import LevelInfo, load_levels, resolve_level
 from app.rapfi.adapter import RapfiAdapter
 
 _COLS = string.ascii_lowercase[:BOARD_SIZE]  # a..o
@@ -51,17 +51,17 @@ def render_board(*, moves: list[Point], forbidden: list[Point]) -> str:
     return "\n".join(rows)
 
 
-async def game_loop(level: Level) -> None:
+async def game_loop(level: LevelInfo) -> None:
     settings = Settings()
     adapter = RapfiAdapter(
         bin_path=settings.resolved_rapfi_bin(),
         config_path=settings.rapfi_config,
         cwd=REPO_ROOT,
     )
-    params = LEVELS[level]
+    params = level.params
     human = random.choice([Color.BLACK, Color.WHITE])
     colour = "чёрными ●" if human is Color.BLACK else "белыми ○"
-    print(f"Уровень: {level.value}. Ты играешь {colour}.")
+    print(f"Уровень: {level.name}. Ты играешь {colour}.")
     moves: list[Point] = []
     try:
         while True:
@@ -113,10 +113,16 @@ async def game_loop(level: Level) -> None:
 
 
 def main() -> None:
+    settings = Settings()
+    levels = load_levels(settings.levels_file)  # пустой набор → ValueError
+    ids = [lv.id for lv in levels]
     parser = argparse.ArgumentParser(description="Партия против Rapfi в терминале")
-    parser.add_argument("--level", choices=[lv.value for lv in Level], default=Level.MEDIUM.value)
+    parser.add_argument("--level", choices=ids, default=ids[0])
     args = parser.parse_args()
-    asyncio.run(game_loop(Level(args.level)))
+    level = resolve_level(levels, args.level)
+    if level is None:  # choices гарантируют валидность; страховка
+        parser.error(f"unknown level: {args.level}")
+    asyncio.run(game_loop(level))
 
 
 if __name__ == "__main__":

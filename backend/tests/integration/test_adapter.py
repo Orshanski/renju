@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from app.domain.levels import LEVELS, EngineParams, Level
+from app.domain.engine_params import EngineParams
 from app.domain.values import BOARD_SIZE
 from app.rapfi.adapter import EngineError, RapfiAdapter
 
@@ -88,5 +88,5 @@ async def test_concurrent_requests_serialized(adapter):
 
 
 async def test_real_levels_work_end_to_end(adapter):
-    move = await adapter.compute_move([(7, 7)], LEVELS[Level.NOVICE])
+    move = await adapter.compute_move([(7, 7)], EngineParams(strength=10, timeout_turn_ms=1000))
     assert on_board(move)

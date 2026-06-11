@@ -1,6 +1,6 @@
 import pytest
 
-from app.domain.levels import EngineParams  # в Task 2 путь станет app.domain.engine_params
+from app.domain.engine_params import EngineParams
 from app.levels_config import LevelInfo, load_levels, resolve_level
 
 _SAMPLE = """

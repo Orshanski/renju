@@ -4,7 +4,7 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
-from app.domain.levels import EngineParams  # Task 2: → app.domain.engine_params
+from app.domain.engine_params import EngineParams
 
 
 @dataclass(frozen=True)
@@ -25,9 +25,7 @@ def load_levels(path: Path) -> list[LevelInfo]:
         LevelInfo(
             id=rec["id"],
             name=rec["name"],
-            params=EngineParams(
-                strength=rec["strength"], timeout_turn_ms=rec["timeout_turn_ms"]
-            ),
+            params=EngineParams(strength=rec["strength"], timeout_turn_ms=rec["timeout_turn_ms"]),
         )
         for rec in data.get("levels", [])
     ]

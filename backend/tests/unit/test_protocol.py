@@ -1,6 +1,6 @@
 import pytest
 
-from app.domain.levels import EngineParams
+from app.domain.engine_params import EngineParams
 from app.rapfi.protocol import (
     LineKind,
     ProtocolError,
