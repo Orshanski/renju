@@ -4,6 +4,7 @@ from app.domain.engine_params import EngineParams
 from app.rapfi.protocol import (
     LineKind,
     ProtocolError,
+    block_commands,
     forbid_commands,
     init_commands,
     parse_line,
@@ -117,3 +118,18 @@ def test_position_commands_rejects_out_of_board_and_duplicates():
         position_commands([(-1, 3)])
     with pytest.raises(ProtocolError):
         position_commands([(7, 7), (7, 7)])
+
+
+def test_block_commands_format():
+    assert block_commands([(8, 7), (0, 0)]) == ["YXBLOCK", "8,7", "0,0", "DONE"]
+
+
+def test_block_commands_empty_is_empty_list():
+    assert block_commands([]) == []
+
+
+def test_block_commands_rejects_non_int_and_out_of_board():
+    # pytest и ProtocolError уже импортированы в шапке test_protocol.py
+    for bad in [(7.0, 7), (True, 3), (15, 0), (-1, 3)]:
+        with pytest.raises(ProtocolError):
+            block_commands([bad])  # type: ignore[list-item]

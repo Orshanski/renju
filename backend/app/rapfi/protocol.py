@@ -95,6 +95,17 @@ def forbid_commands(moves: Sequence[Point]) -> list[str]:
     return ["YXBOARD", *_stone_lines(moves), "DONE", "YXSHOWFORBID"]
 
 
+def block_commands(block_points: Sequence[Point]) -> list[str]:
+    """YXBLOCK-блок: ['YXBLOCK', 'x,y', ..., 'DONE'] для непустого списка, иначе [].
+
+    Формат снят с движка (gomocup.cpp:getBlock): 'x,y' до DONE, без поля who.
+    Анти-инъекция (§5.2): в stdin — только int 0..14."""
+    if not block_points:
+        return []
+    _validate_moves(block_points)
+    return ["YXBLOCK", *[f"{x},{y}" for x, y in block_points], "DONE"]
+
+
 def _stone_lines(moves: Sequence[Point]) -> list[str]:
     side_to_move_parity = len(moves) % 2
     return [f"{x},{y},{1 if i % 2 == side_to_move_parity else 2}" for i, (x, y) in enumerate(moves)]
