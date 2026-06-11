@@ -48,6 +48,7 @@ class MoveRejectReason(StrEnum):
     OCCUPIED = "occupied"
     NOT_YOUR_TURN = "not_your_turn"
     FORBIDDEN = "forbidden"
+    OPENING_VIOLATION = "opening_violation"
     GAME_FINISHED = "game_finished"
 
 

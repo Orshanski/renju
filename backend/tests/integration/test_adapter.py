@@ -90,3 +90,34 @@ async def test_concurrent_requests_serialized(adapter):
 async def test_real_levels_work_end_to_end(adapter):
     move = await adapter.compute_move([(7, 7)], EngineParams(strength=10, timeout_turn_ms=1000))
     assert on_board(move)
+
+
+async def test_compute_move_in_3x3_zone(adapter):
+    from app.domain.opening import opening_zone
+
+    move = await adapter.compute_move([(7, 7)], FAST, allowed_zone=opening_zone(1))
+    assert move in opening_zone(1)
+    assert move != (7, 7)
+
+
+async def test_compute_move_in_5x5_zone(adapter):
+    from app.domain.opening import opening_zone
+
+    move = await adapter.compute_move([(7, 7), (8, 8)], FAST, allowed_zone=opening_zone(2))
+    assert move in opening_zone(2)
+    assert move not in {(7, 7), (8, 8)}
+
+
+async def test_block_does_not_leak_to_next_request(adapter):
+    # после дебютного запроса с зоной — следующий БЕЗ зоны не ограничен 5×5.
+    # far-кластер на левом крае (x=0): candidate-область движка (square3_line4)
+    # не достаёт до x≥5, т.е. до зоны 5×5. Если бы блок протёк, все кандидаты
+    # кластера (x≤4) были бы заблокированы → ход у кластера невозможен → compute_move
+    # упал бы. Чистый ответ x≤4 (не в 5×5) доказывает: блок снят, не протёк.
+    from app.domain.opening import opening_zone
+
+    await adapter.compute_move([(7, 7), (8, 8)], FAST, allowed_zone=opening_zone(2))
+    far = [(0, 2), (0, 3), (0, 4), (0, 5), (0, 6)]  # кластер на левом крае
+    move = await adapter.compute_move(far, FAST)  # без зоны
+    assert move not in set(far)
+    assert move not in opening_zone(2)  # ход у кластера (x≤4), не зажат в 5×5

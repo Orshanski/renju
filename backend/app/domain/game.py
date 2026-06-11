@@ -1,11 +1,11 @@
-"""Игровая логика партии: валидация хода человека, усечение undo. Чистые функции."""
+"""Игровая логика партии: валидация хода, усечение undo. Чистые функции."""
 
 from collections.abc import Sequence
 
+from app.domain.opening import opening_zone
 from app.domain.values import (
     BOARD_SIZE,
     Color,
-    GameStatus,
     MoveRejected,
     MoveRejectReason,
     Point,
@@ -15,42 +15,36 @@ from app.domain.values import (
 )
 
 
-def validate_human_move(
+def validate_move(
     *,
     moves: Sequence[Point],
-    human_color: Color,
-    status: GameStatus,
     point: Point,
     forbidden: Sequence[Point],
 ) -> None:
-    """Бросает MoveRejected, если ход человека недопустим. Порядок проверок важен:
-    сначала состояние партии, потом геометрия, потом фолы."""
-    if status.is_finished:
-        raise MoveRejected(MoveRejectReason.GAME_FINISHED)
-    if status is not GameStatus.AWAITING_HUMAN:
-        raise MoveRejected(MoveRejectReason.NOT_YOUR_TURN)
-    if color_to_move(len(moves)) is not human_color:
-        raise MoveRejected(MoveRejectReason.NOT_YOUR_TURN)
+    """Бросает MoveRejected, если ход недопустим ПО ПРАВИЛАМ (геометрия → занятость →
+    дебютная зона → фол). Статус партии и очередь — оркестрация, не здесь.
+    Сторона-на-ходу выводится из len(moves); роль (человек/ИИ) не нужна."""
     x, y = point
     if not (0 <= x < BOARD_SIZE and 0 <= y < BOARD_SIZE):
         raise MoveRejected(MoveRejectReason.OUT_OF_BOARD)
     if point in set(moves):
         raise MoveRejected(MoveRejectReason.OCCUPIED)
-    if human_color is Color.BLACK and point in set(forbidden):
+    zone = opening_zone(len(moves))
+    if zone is not None and point not in zone:
+        raise MoveRejected(MoveRejectReason.OPENING_VIOLATION)
+    if color_to_move(len(moves)) is Color.BLACK and point in set(forbidden):
         raise MoveRejected(MoveRejectReason.FORBIDDEN)
 
 
-def undo_truncate(*, moves: Sequence[Point], human_color: Color) -> list[Point]:
-    """Усечь ходы до предыдущего состояния «ход человека».
-
-    Новая длина k — наибольшая k < len(moves), при которой очередь человека:
-    k чётно для чёрных, нечётно для белых. Обычно убирает 2 камня (ход ИИ + свой),
-    после завершающего хода человека — 1.
-    """
+def undo_truncate(*, moves: Sequence[Point], human_color: Color, preset: int = 1) -> list[Point]:
+    """Усечь ходы до предыдущего состояния «ход человека», не снимая preset
+    стартовых камней (центр предзаполнен). Новая длина k — наибольшая
+    preset ≤ k < len(moves) c очередью человека (k чётно для чёрных, нечётно для белых).
+    Если такого k нет — NOTHING_TO_UNDO."""
     target_parity = 0 if human_color is Color.BLACK else 1
     k = len(moves) - 1
-    while k >= 0 and k % 2 != target_parity:
+    while k >= preset and k % 2 != target_parity:
         k -= 1
-    if k < 0:
+    if k < preset:
         raise UndoRejected(UndoRejectReason.NOTHING_TO_UNDO)
     return list(moves[:k])
