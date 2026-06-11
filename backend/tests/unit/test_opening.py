@@ -11,6 +11,7 @@ def test_move_zero_is_center_only():
 
 def test_move_one_is_central_3x3():
     zone = opening_zone(1)
+    assert zone is not None
     assert zone == frozenset((x, y) for x in range(6, 9) for y in range(6, 9))
     assert len(zone) == 9
     assert (6, 6) in zone and (8, 8) in zone
@@ -19,6 +20,7 @@ def test_move_one_is_central_3x3():
 
 def test_move_two_is_central_5x5():
     zone = opening_zone(2)
+    assert zone is not None
     assert zone == frozenset((x, y) for x in range(5, 10) for y in range(5, 10))
     assert len(zone) == 25
     assert (5, 5) in zone and (9, 9) in zone

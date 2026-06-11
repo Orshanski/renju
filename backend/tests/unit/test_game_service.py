@@ -62,7 +62,8 @@ class _FakeAdapter:
 async def test_engine_move_passes_opening_zone_as_allowed_zone():
     fake = _FakeAdapter()
     moves = [(7, 7)]  # ход 2 → зона 3×3
-    move = await engine_move(fake, moves, EngineParams(strength=50, timeout_turn_ms=1000))
+    params = EngineParams(strength=50, timeout_turn_ms=1000)
+    move = await engine_move(fake, moves, params)  # type: ignore[arg-type]  # _FakeAdapter — дубль
     assert move == (8, 8)
     assert fake.received_zone == opening_zone(1)
 
@@ -70,5 +71,6 @@ async def test_engine_move_passes_opening_zone_as_allowed_zone():
 async def test_engine_move_unrestricted_after_opening():
     fake = _FakeAdapter()
     moves = [(7, 7), (8, 8), (9, 9), (6, 6)]  # len=4 → зона None
-    await engine_move(fake, moves, EngineParams(strength=50, timeout_turn_ms=1000))
+    params = EngineParams(strength=50, timeout_turn_ms=1000)
+    await engine_move(fake, moves, params)  # type: ignore[arg-type]
     assert fake.received_zone is None
