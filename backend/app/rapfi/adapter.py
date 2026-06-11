@@ -97,6 +97,9 @@ class RapfiAdapter:
             raise EngineError(f"engine failed twice: {e!r}") from e
 
     async def _attempt(self, commands: list[str], want: LineKind, timeout_s: float) -> ParsedLine:
+        # spawn намеренно вне asyncio.timeout: create_subprocess_exec не блокирует
+        # (веса грузятся лениво на первой stdin-команде, уже под таймаутом ниже).
+        # Не переносить блокирующую работу в _ensure_proc — сбежит от wall-clock.
         proc = await self._ensure_proc()
         async with asyncio.timeout(timeout_s):
             await proc.send(commands)
