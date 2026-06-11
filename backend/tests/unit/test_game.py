@@ -71,9 +71,12 @@ def test_forbidden_ignored_for_white():
 # def test_engine_thinking_rejected(): ...
 
 
-def test_undo_black_human_removes_engine_and_own_move():
-    # чёрный человек: [B(7,7), W(8,8)] → снова ход чёрных, убрать оба
-    assert undo_truncate(moves=[(7, 7), (8, 8)], human_color=Color.BLACK) == []
+def test_undo_black_human_at_preset_floor_rejected():
+    # preset-модель: [center, white] — ход чёрного, но чёрный ещё не делал
+    # реального хода (центр — старт). Откат недопустим.
+    with pytest.raises(UndoRejected) as e:
+        undo_truncate(moves=[(7, 7), (8, 8)], human_color=Color.BLACK)
+    assert e.value.reason is UndoRejectReason.NOTHING_TO_UNDO
 
 
 def test_undo_black_human_after_own_finishing_move_removes_one():

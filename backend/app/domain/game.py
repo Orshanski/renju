@@ -36,17 +36,15 @@ def validate_move(
         raise MoveRejected(MoveRejectReason.FORBIDDEN)
 
 
-def undo_truncate(*, moves: Sequence[Point], human_color: Color) -> list[Point]:
-    """Усечь ходы до предыдущего состояния «ход человека».
-
-    Новая длина k — наибольшая k < len(moves), при которой очередь человека:
-    k чётно для чёрных, нечётно для белых. Обычно убирает 2 камня (ход ИИ + свой),
-    после завершающего хода человека — 1.
-    """
+def undo_truncate(*, moves: Sequence[Point], human_color: Color, preset: int = 1) -> list[Point]:
+    """Усечь ходы до предыдущего состояния «ход человека», не снимая preset
+    стартовых камней (центр предзаполнен). Новая длина k — наибольшая
+    preset ≤ k < len(moves) c очередью человека (k чётно для чёрных, нечётно для белых).
+    Если такого k нет — NOTHING_TO_UNDO."""
     target_parity = 0 if human_color is Color.BLACK else 1
     k = len(moves) - 1
-    while k >= 0 and k % 2 != target_parity:
+    while k >= preset and k % 2 != target_parity:
         k -= 1
-    if k < 0:
+    if k < preset:
         raise UndoRejected(UndoRejectReason.NOTHING_TO_UNDO)
     return list(moves[:k])
