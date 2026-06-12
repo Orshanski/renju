@@ -1,13 +1,15 @@
 import asyncio
+import json as _json
 import logging
 import random
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, FastAPI, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import CurrentUser
+from app.auth import CurrentUser, decode_token, fetch_token_epoch, get_current_user
 from app.db.deps import get_session
 from app.domain.values import GameStatus
 from app.exceptions import BadInputError
@@ -181,3 +183,34 @@ async def undo(
 ):
     game = await _service(request, session).undo(game_id, user.user_id)
     return _state(game, user.user_id, request.app.state.event_hub)
+
+
+@router.get("/games/{game_id}/events")
+async def events(game_id: str, request: Request, since: int = 0):
+    # SSE — долгоживущий стрим: НЕ берём Depends(current_user)/Depends(get_session)
+    # (они держали бы request-сессию открытой весь стрим). Auth+доступ — на КОРОТКОЙ сессии.
+    hub = request.app.state.event_hub
+    sm = request.app.state.sessionmaker
+    settings = request.app.state.settings
+    async with sm() as s0:
+        user = await get_current_user(request, s0, settings)  # нет cookie/отозван → AuthError→401
+        game = await _service(request, s0).get_game(game_id, user.user_id)  # 404 если нет доступа
+    if game.status == GameStatus.OPPONENT_THINKING.value:  # §4.8: застрявшая → доиграть фоном
+        schedule_advance(request.app, game_id)
+    jwt_epoch = decode_token(request.cookies[settings.cookie_name], settings).get("tep", 0)
+
+    async def gen():
+        # heartbeat живёт ВНУТРИ subscribe (idle_timeout) — НЕ оборачиваем __anext__ снаружи (B-2)
+        async for ev in hub.subscribe(game_id, since, idle_timeout=settings.sse_heartbeat_s):
+            if ev["type"] == "ping":
+                async with sm() as s2:  # epoch-recheck на свежей короткой сессии
+                    cur = await fetch_token_epoch(s2, user.user_id)
+                if cur is None or cur != jwt_epoch:
+                    return  # сессия отозвана — закрыть стрим
+                yield ": ping\n\n"
+            else:  # data = весь объект события {seq, type, payload} (спека §«Контракт SSE», N-2)
+                yield f"event: {ev['type']}\ndata: {_json.dumps(ev)}\n\n"
+
+    return StreamingResponse(
+        gen(), media_type="text/event-stream", headers={"X-Accel-Buffering": "no"}
+    )
