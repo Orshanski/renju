@@ -5,6 +5,9 @@ from app.config import Settings
 
 
 def make_engine(settings: Settings) -> AsyncEngine:
+    # каталог data_dir может не существовать на свежем деплое — иначе sqlite
+    # падает с «unable to open database file» ещё до создания файла БД.
+    settings.resolved_db_path.parent.mkdir(parents=True, exist_ok=True)
     engine = create_async_engine(f"sqlite+aiosqlite:///{settings.resolved_db_path}")
 
     @event.listens_for(engine.sync_engine, "connect")

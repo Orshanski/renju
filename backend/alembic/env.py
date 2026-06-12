@@ -23,6 +23,8 @@ import app.models.game  # noqa: F401
 
 target_metadata = Base.metadata
 _settings = Settings()
+# свежий деплой: data_dir может не существовать — создаём до открытия БД
+_settings.resolved_db_path.parent.mkdir(parents=True, exist_ok=True)
 config.set_main_option("sqlalchemy.url", f"sqlite+aiosqlite:///{_settings.resolved_db_path}")
 
 # other values from the config, defined by the needs of env.py,
