@@ -90,7 +90,7 @@
 ```
 - [ ] **Step 2: `frontend/tsconfig.json`** (strict, один плоский конфиг)
 
-Один tsconfig покрывает `src`; **без** `tsc -b`/project-references (поэтому build — `tsc --noEmit && vite build`, см. Step 1). `vite.config.ts` исполняется самим Vite через esbuild и нашим `tsc` не тайпчекается (8 строк, типы из `/// <reference types="vitest/config" />`) — отдельный `tsconfig.node.json` не нужен.
+Один tsconfig покрывает `src`; **без** `tsc -b`/project-references (поэтому build — `tsc --noEmit && vite build`, см. Step 1). `vite.config.ts` исполняется самим Vite через esbuild и нашим `tsc` не тайпчекается (типы из `/// <reference types="vitest/config" />`) — отдельный `tsconfig.node.json` не нужен. **`"vite/client"` в `types` обязателен** (как в librarium): он объявляет ambient-модули для side-effect/CSS-импортов (`*.module.css`, `import "./styles/theme.module.css"`) и `import.meta.env`; без него TS/LSP ругается «Cannot find module … side-effect import».
 ```json
 {
   "compilerOptions": {
@@ -99,7 +99,7 @@
     "allowImportingTsExtensions": true, "resolveJsonModule": true, "isolatedModules": true,
     "moduleDetection": "force", "noEmit": true, "jsx": "react-jsx",
     "strict": true, "noUnusedLocals": true, "noUnusedParameters": true, "noFallthroughCasesInSwitch": true,
-    "types": ["vitest/globals", "@testing-library/jest-dom"]
+    "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"]
   },
   "include": ["src"]
 }
@@ -112,11 +112,8 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
-  server: {
-    host: true, // слушать все интерфейсы (вкл. Tailscale) — дев-сервер доступен с iPad/телефона по тайлнету
-    allowedHosts: [".tail0972f1.ts.net"], // MagicDNS своего тайлнета; Tailscale-IP (100.x) разрешены по умолчанию
-    proxy: { "/api": "http://127.0.0.1:8000" }, // dev: один origin для браузера; бэк остаётся на localhost
-  },
+  // Без dev-сервера: фронт доставляет БЭК (StaticFiles отдаёт собранный dist/). Vite здесь — только
+  // бандлер (build) и тест-раннер (test). Доступ (вкл. Tailscale) — к бэку, не к Vite.
   build: {
     outDir: "dist",
     modulePreload: { polyfill: false }, // CSP: убрать inline polyfill-скрипт (цель — современный Safari)
@@ -610,7 +607,7 @@ it("500/прочее → общий «ошибка входа», без реди
 ```
 - [ ] **Step 3: `frontend/src/pages/LoginPage.tsx`**
 ```tsx
-import { useState, type FormEvent } from "react";
+import { useState, type SyntheticEvent } from "react"; // FormEvent депрекейтнут в @types/react 19
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { ApiError } from "../api/client";
@@ -624,7 +621,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function onSubmit(e: FormEvent) {
+  async function onSubmit(e: SyntheticEvent) {
     e.preventDefault();
     setBusy(true);
     setError("");
@@ -952,8 +949,8 @@ RENJU_DATA_DIR=/tmp/renju-fe uv run alembic upgrade head && RENJU_DATA_DIR=/tmp/
 5. Зайти на `/` без куки (инкогнито) → отдаётся страница (200), затем клиентский редирект на `/login`.
 6. Неверный пароль → inline «Неверные имя или пароль», поле пароля очищено, без редиректа.
 - [ ] **Step 3b: Tailscale-проверка (прод-режим).** С iPad (`ipad1410`) по тайлнету: открыть `http://macbook-pro-orshanski.tail0972f1.ts.net:8000/` (или `http://100.93.96.5:8000/`) → та же страница рендерится, логин работает, **консоль без CSP-violation** (CSP — `'self'`, same-origin, к хосту не привязан; cookie `secure=False` → проходит по http). Подтверждает критерий «iPad-первичный» из спеки вживую.
-- [ ] **Step 4: Dev-режим smoke (опц.).** `cd frontend && npm run dev` (Vite слушает все интерфейсы: `http://localhost:5173`, по Tailscale — `http://macbook-pro-orshanski.tail0972f1.ts.net:5173` или `http://100.93.96.5:5173`; прокси `/api`→8000); тот же сценарий, в т.ч. с iPad. HMR через тайлнет работает (Vite `host: true`).
-- [ ] **Step 5: Финал.** Полный фронт-прогон + бэк-прогон зелёные. Коммит (если правки линта): `git commit -m "chore(rj-0z2): eslint фронта + smoke-проверка"`.
+> Отдельного Vite-dev-сервер-смоука нет: фронт доставляет бэк (Step 3/3b — единственный путь). Vite-dev-сервер из модели убран.
+- [ ] **Step 4: Финал.** Полный фронт-прогон + бэк-прогон зелёные. Коммит (если правки линта): `git commit -m "chore(rj-0z2): eslint фронта + smoke-проверка"`.
 
 ---
 
@@ -968,7 +965,8 @@ RENJU_DATA_DIR=/tmp/renju-fe uv run alembic upgrade head && RENJU_DATA_DIR=/tmp/
 - **Без плейсхолдеров:** код во всех шагах полный.
 - **Ревью-правки (свежий Opus) применены:** B1 build `tsc --noEmit && vite build`, один плоский tsconfig без project-references (T1); B2 убран ненадёжный assertion `request.credentials` — куку проверяет живой смоук (T2/T8); M1 дефолтный `me`→401 в `setupServer` (T2); M2 добавлены ветки `me`=500 (T3) и login=500 (T5); M4 гард каталога `assets` перед mount (T7); M5 GET-якорь порядка роутеров `/api/auth/me`→401 (T7); m5 полный `App.tsx` собирается в T6 (заглушка из T1 до этого) — каждый коммит компилируется.
 - **Ре-ревью (2-й свежий Opus), правки применены:** убран осиротевший `tsconfig.node.json` из Files (T1); снята избыточная правка корневого `.gitignore` — уже покрывает `node_modules/`/`dist/`/`frontend/dist/` (T1); реализован `theme.module.css` (токены) + side-effect-импорт в `main.tsx` + модули срезов переведены на `var(--…)` (T1/T5/T6) — закрыт задекларированный-но-не-созданный deliverable спеки §«Сквозные конвенции»; SPA-фикстура импортирует обе модели до `create_all` (T7); catch-all защищён от path-traversal (`is_relative_to(dist_root)`) + убраны мёртвые импорты `_Path`/`Request` (T7). Блокеров/мейджоров во 2-м проходе ревьюер не нашёл.
-- **Tailscale-доступ (запрос Alexey):** Vite `server.host: true` + `allowedHosts: ['.tail0972f1.ts.net']` (T1) — дев-сервер виден с iPad/телефона по тайлнету; прод-смоук `uvicorn --host 0.0.0.0` + явная Tailscale-проверка с iPad (T8 Step 3b/4). CSP `'self'` к хосту не привязан, cookie `secure=False` → http-доступ по тайлнету проходит.
+- **Доставка и Tailscale (поправка Alexey):** фронт доставляет **бэк** (StaticFiles отдаёт собранный `dist/`) — Vite-dev-сервер из модели **убран** (`vite.config` без `server`-блока; Vite = только бандлер+тест-раннер). Доступ, включая Tailscale, — к **бэку**: `uvicorn --host 0.0.0.0` + явная проверка с iPad `http://macbook-pro-orshanski.tail0972f1.ts.net:8000/` (T8 Step 3/3b). CSP `'self'` к хосту не привязан, cookie `secure=False` → http по тайлнету проходит.
+- **tsconfig `vite/client` (поправка по LSP, сверено с librarium):** `"types"` включает `vite/client` (T1 Step 2) — ambient-объявления для side-effect/CSS-импортов (`*.module.css`) и `import.meta.env`; без него TS/LSP падал на `import "./styles/theme.module.css"`. (Ошибки LSP вида «Cannot find module react» — отдельное: TS-сервер не пере-сканировал свежий `frontend/node_modules`; `tsc --noEmit`=0 и `vite build` это опровергают.)
 
 ## Что НЕ в этом плане (scope — не предлагать как findings)
 - Игровая доска, SSE-клиент, ход/undo (срез 2). Список/новая/восстановление (срез 3). Настройки+бэк `/settings` (срез 4). Админка+бэк-эндпоинты (срез 5). «Правила» (срез 6). PWA. Playwright/visual-regression/геометрия-тесты (отложены — тест-дисциплина B).
