@@ -33,6 +33,7 @@ frontend/dist/
 # Secrets / local env
 .env
 .env.*
+/data/
 !.env.example
 
 # Beads / Dolt files (added by bd init)
