@@ -221,6 +221,54 @@ async def test_undo_pure_replay_no_engine():
     assert svc._adapter.calls == 0  # undo без движка
 
 
+async def test_advance_recovers_and_is_idempotent():
+    svc = _svc()
+    g = await svc.create_game(owner_id=1, opponent_level="master", human_color="black")
+    # create оставил opponent_thinking (ход 2 за движком); фоновой задачи в юните нет
+    assert g.status == "opponent_thinking" and g.moves == [[7, 7]]
+    await svc.advance(g)  # «восстановление»: движок-белый ходит 2-м
+    assert g.moves == [[7, 7], [8, 8]] and g.status == "awaiting_move"
+    snapshot = [list(m) for m in g.moves]
+    await svc.advance(g)  # повтор — no-op: ход человека-чёрного, advance ждёт подачу
+    assert g.moves == snapshot and g.status == "awaiting_move"
+
+
+async def test_advance_recovery_when_engine_move_already_applied():
+    # реальный краш: ход движка УЖЕ закоммичен, но статус застрял opponent_thinking
+    # (упали между repo.update(move) и переходом в awaiting_move) → recovery НЕ двигает повторно
+    svc = _svc()
+    g = await svc.create_game(owner_id=1, opponent_level="master", human_color="black")
+    await svc.advance(g)  # движок сходил → [[7,7],[8,8]], awaiting_move (ход человека-чёрного)
+    g.status = "opponent_thinking"
+    await svc._repo.update(g)  # симулируем застрявший статус
+    svc._adapter.calls = 0
+    orig = svc._adapter.compute_move
+
+    async def counting(*a, **k):
+        svc._adapter.calls += 1
+        return await orig(*a, **k)
+
+    svc._adapter.compute_move = counting
+    await svc.advance(g)  # позиция = ход человека → advance оседает на awaiting_move без движка
+    assert g.moves == [[7, 7], [8, 8]] and g.status == "awaiting_move"
+    assert svc._adapter.calls == 0  # движок НЕ дёрнут — ход не задвоен
+
+
+async def test_get_game_pure_access_check():
+    import pytest
+
+    from app.exceptions import NotFoundError
+
+    svc = _svc()
+    g = await svc.create_game(owner_id=1, opponent_level="master", human_color="black")
+    assert (await svc.get_game(g.id, user_id=1)).id == g.id  # участник — ок
+    with pytest.raises(NotFoundError):
+        await svc.get_game(g.id, user_id=2)  # чужой → 404
+    with pytest.raises(NotFoundError):
+        await svc.get_game("missing", user_id=1)
+    assert g.status == "opponent_thinking"  # get_game НЕ ходит движком (фон — забота роутера)
+
+
 async def test_undo_no_engine_even_with_sparse_log():
     # структурная гарантия: undo не зовёт движок, даже если ключ форбидов позиции,
     # на которую приземляется откат, НЕ мемоизирован (sparse log). Старый код (fouls)

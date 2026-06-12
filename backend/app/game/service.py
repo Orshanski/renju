@@ -172,6 +172,19 @@ class GameService:
         await self._repo.update(game)
         return game  # advance НЕ здесь: при opponent_thinking роутер запланирует фоновый прогон
 
+    async def get_game(self, game_id: str, user_id: int) -> Game:
+        # чистый доступ с проверкой участия; восстановление (фоновый advance при
+        # opponent_thinking) планирует роутер — сервис не владеет фоновыми сессиями.
+        return await self._load_owned(game_id, user_id)
+
+    async def load(self, game_id: str) -> Game | None:
+        # сырая загрузка по id (без проверки участия) — для фоновой задачи роутера,
+        # которая прогоняет advance уже после того, как запрос проверил доступ.
+        return await self._repo.get(game_id)
+
+    async def list_games(self, owner_id: int) -> list[Game]:
+        return await self._repo.list_by_owner(owner_id)
+
     async def undo(self, game_id: str, user_id: int) -> Game:
         game = await self._load_owned(game_id, user_id)
         check_undo(
