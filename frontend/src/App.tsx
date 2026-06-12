@@ -8,6 +8,7 @@ import { Shell } from "./components/Shell";
 // экраны — ленивые chunk'и по роутам: каждый срез грузит своё, index не пухнет
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const HomePage = lazy(() => import("./pages/HomePage"));
+const GamePage = lazy(() => import("./pages/GamePage"));
 
 function UnauthorizedBridge() {
   const navigate = useNavigate();
@@ -31,6 +32,7 @@ export default function App() {
             <Route element={<ProtectedRoute />}>
               <Route element={<Shell />}>
                 <Route path="/" element={<HomePage />} />
+                <Route path="/game/:gameId" element={<GamePage />} />
               </Route>
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
