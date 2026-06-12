@@ -56,6 +56,18 @@ describe("move", () => {
   it("несоответствие индекса (рассинхрон) → resync", () => {
     expect(applyEvent(view(), ev({ seq: 6, type: "move", payload: { by: "black", point: [8, 8], move_index: 7 } }))).toBe("resync");
   });
+  it("чужой ход обогнал pending (move_index == moves.length при живом pending) → resync", () => {
+    const pending = placePending(view(), [8, 8]); // pendingIndex=2, moves.length=3
+    expect(applyEvent(pending, ev({ seq: 6, type: "move", payload: { by: "white", point: [9, 9], move_index: 3 } }))).toBe("resync");
+  });
+  it("pending: индекс совпал, точка НЕТ → resync", () => {
+    const pending = placePending(view(), [8, 8]);
+    expect(applyEvent(pending, ev({ seq: 6, type: "move", payload: { by: "black", point: [9, 9], move_index: 2 } }))).toBe("resync");
+  });
+  it("pending: точка совпала, индекс НЕТ → resync", () => {
+    const pending = placePending(view(), [8, 8]);
+    expect(applyEvent(pending, ev({ seq: 6, type: "move", payload: { by: "black", point: [8, 8], move_index: 5 } }))).toBe("resync");
+  });
 });
 
 describe("status / forbidden / undo / reset / error", () => {
