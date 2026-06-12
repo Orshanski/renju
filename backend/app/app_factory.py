@@ -71,4 +71,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def health():
         return {"ok": True}
 
+    # SPA: статика + fallback на index.html — ПОСЛЕДними, чтобы не перехватывать /api/*.
+    # /api/* мимо роутера отдаёт 404 JSON (см. ниже), не index.html.
+    from fastapi.responses import FileResponse, JSONResponse
+    from fastapi.staticfiles import StaticFiles
+
+    dist = settings.frontend_dist
+    if dist.is_dir():
+        dist_root = dist.resolve()
+        assets = dist / "assets"
+        if assets.is_dir():  # StaticFiles падает без каталога; гард — частичный dist не ронял старт
+            app.mount("/assets", StaticFiles(directory=assets), name="assets")
+
+        @app.get("/{full_path:path}")
+        async def spa(full_path: str):
+            if full_path.startswith("api/"):
+                return JSONResponse({"detail": "Not Found"}, status_code=404)
+            candidate = (dist / full_path).resolve()
+            # is_relative_to: ../-обход не должен выйти за dist (path-traversal). /assets-mount
+            # StaticFiles защищает сам; этот корневой file-branch (favicon и пр.) — нет, гард тут.
+            if full_path and candidate.is_file() and candidate.is_relative_to(dist_root):
+                return FileResponse(candidate)
+            return FileResponse(dist / "index.html")
+
     return app
