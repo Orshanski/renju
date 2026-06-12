@@ -75,3 +75,69 @@ async def client(app):
         headers={"X-Requested-With": "XMLHttpRequest"},
     ) as c:
         yield c
+
+
+class _FakeAdapter:
+    """Фейк-движок для юнит-API: ходит в ПЕРВУЮ свободную клетку зоны (без коллизий в advance)."""
+
+    async def forbidden_points(self, moves):
+        return []
+
+    async def compute_move(self, moves, params, allowed_zone=None):
+        occupied = {tuple(m) for m in moves}
+        cells = (
+            sorted(allowed_zone) if allowed_zone else [(x, y) for x in range(15) for y in range(15)]
+        )
+        for c in cells:
+            if tuple(c) not in occupied:
+                return tuple(c)
+        raise AssertionError("board full")
+
+    async def close(self):
+        pass
+
+
+@pytest.fixture
+def games_api():
+    """Хелперы игровых API-тестов: FakeAdapter, seed_login, wait_settled, free_move."""
+    import asyncio as _aio
+    from types import SimpleNamespace
+
+    from app.domain.opening import opening_zone
+
+    async def seed_login(app, client, username="alice"):
+        from app.dal import users as dal
+
+        async with app.state.sessionmaker() as s:
+            if not await dal.get_user_by_username(s, username):
+                await dal.create_user(s, username, "pw")
+                await s.commit()
+        await client.post("/api/auth/login", json={"username": username, "password": "pw"})
+
+    async def wait_settled(client, gid, tries=100, delay=0.02):
+        """Поллить GET, пока партия не уйдёт из opponent_thinking (фоновый advance осел)."""
+        st = (await client.get(f"/api/games/{gid}")).json()
+        for _ in range(tries):
+            if st["status"] != "opponent_thinking":
+                return st
+            await _aio.sleep(delay)
+            st = (await client.get(f"/api/games/{gid}")).json()
+        return st
+
+    def free_move(state):
+        """Свободная ЛЕГАЛЬНАЯ клетка текущей дебютной зоны (с учётом фолов из state)."""
+        occupied = {tuple(m) for m in state["moves"]}
+        forbidden = {tuple(p) for p in state.get("forbidden", [])}
+        zone = opening_zone(len(state["moves"]))
+        cells = sorted(zone) if zone else [(x, y) for x in range(15) for y in range(15)]
+        for c in cells:
+            if c not in occupied and c not in forbidden:
+                return c
+        raise AssertionError("no free legal cell")
+
+    return SimpleNamespace(
+        FakeAdapter=_FakeAdapter,
+        seed_login=seed_login,
+        wait_settled=wait_settled,
+        free_move=free_move,
+    )

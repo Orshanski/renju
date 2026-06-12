@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     cookie_name: str = "renju_token"
     secure_cookie: bool = False  # RENJU_SECURE_COOKIE
     busy_timeout_ms: int = 5000
+    sse_heartbeat_s: int = 15
 
     @property
     def resolved_db_path(self) -> Path:

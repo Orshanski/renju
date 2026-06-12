@@ -31,6 +31,19 @@ def register_error_handlers(app: FastAPI) -> None:
 
         app.add_exception_handler(exc_type, make(status))
 
+    from app.domain.values import MoveRejected, MoveRejectReason, UndoRejected, UndoRejectReason
+
+    def _rejected(_request: Request, exc: Exception) -> JSONResponse:
+        reason = exc.reason  # type: ignore[attr-defined]
+        opp = (
+            reason is MoveRejectReason.OPPONENT_THINKING
+            or reason is UndoRejectReason.OPPONENT_THINKING
+        )
+        return JSONResponse(status_code=409 if opp else 422, content={"detail": reason.value})
+
+    app.add_exception_handler(MoveRejected, _rejected)
+    app.add_exception_handler(UndoRejected, _rejected)
+
     async def _unhandled(_request: Request, exc: Exception) -> JSONResponse:
         import logging
 
