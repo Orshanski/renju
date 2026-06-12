@@ -115,6 +115,14 @@ export default defineConfig({
     outDir: "dist",
     modulePreload: { polyfill: false }, // CSP: убрать inline polyfill-скрипт (цель — современный Safari)
     assetsInlineLimit: 0, // CSP: не инлайнить ассеты
+    rollupOptions: {
+      output: {
+        // модульность бандла: ВЕСЬ вендор (node_modules) отдельным chunk'ом, index — только наш код;
+        // экраны грузятся ленивыми chunk'ами по роутам (React.lazy в App.tsx).
+        // Функциональная форма: списочная ("react-dom") не цепляет subpath-импорты вида react-dom/client.
+        manualChunks: (id) => (id.includes("node_modules") ? "vendor" : undefined),
+      },
+    },
   },
   test: { environment: "jsdom", globals: true, setupFiles: ["./src/test/setup.ts"], css: true },
 });
@@ -764,13 +772,15 @@ export default function HomePage() {
 - [ ] **Step 5: `frontend/src/App.tsx`** — заменить заглушку Task 1 на полный роутер + провод 401→/login (все импортируемые модули уже созданы: `AuthProvider` T3, `ProtectedRoute` T4, `LoginPage` T5, `Shell`/`HomePage` T6)
 ```tsx
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { AuthProvider } from "./auth/AuthContext";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
 import { setUnauthorizedHandler } from "./api/client";
-import LoginPage from "./pages/LoginPage";
-import HomePage from "./pages/HomePage";
 import { Shell } from "./components/Shell";
+
+// экраны — ленивые chunk'и по роутам: каждый срез грузит своё, index не пухнет
+const LoginPage = lazy(() => import("./pages/LoginPage"));
+const HomePage = lazy(() => import("./pages/HomePage"));
 
 function UnauthorizedBridge() {
   const navigate = useNavigate();
@@ -788,15 +798,17 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <UnauthorizedBridge />
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route element={<ProtectedRoute />}>
-            <Route element={<Shell />}>
-              <Route path="/" element={<HomePage />} />
+        <Suspense fallback={<div>Загрузка…</div>}>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route element={<ProtectedRoute />}>
+              <Route element={<Shell />}>
+                <Route path="/" element={<HomePage />} />
+              </Route>
             </Route>
-          </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
       </AuthProvider>
     </BrowserRouter>
   );
@@ -956,6 +968,8 @@ RENJU_DATA_DIR=/tmp/renju-fe uv run alembic upgrade head && RENJU_DATA_DIR=/tmp/
 - **Доставка и Tailscale (поправка Alexey):** фронт доставляет **бэк** (StaticFiles отдаёт собранный `dist/`) — Vite-dev-сервер из модели **убран** (`vite.config` без `server`-блока; Vite = только бандлер+тест-раннер). Доступ, включая Tailscale, — к **бэку**: `uvicorn --host 0.0.0.0` + явная проверка с iPad `http://macbook-pro-orshanski.tail0972f1.ts.net:8000/` (T8 Step 3/3b). CSP `'self'` к хосту не привязан, cookie `secure=False` → http по тайлнету проходит.
 - **tsconfig `vite/client` (поправка по LSP, сверено с librarium):** `"types"` включает `vite/client` (T1 Step 2) — ambient-объявления для side-effect/CSS-импортов (`*.module.css`) и `import.meta.env`; без него TS/LSP падал на `import "./styles/theme.module.css"`. (Ошибки LSP вида «Cannot find module react» — отдельное: TS-сервер не пере-сканировал свежий `frontend/node_modules`; `tsc --noEmit`=0 и `vite build` это опровергают.)
 - **Двухстадийное ревью по задачам (Sonnet impl + Opus spec+quality):** T2/T3/T5/T6 — Approved; минорные фиксы внесены (T2: сброс 401-обработчика в setup + тесты non-JSON/204; T3: тест useAuth-вне-провайдера + `Promise<void>`; T5: `FormEvent`→`SyntheticEvent`, гард двойного сабмита; T6: cleanup `UnauthorizedBridge`). **Сознательные KEEP (документированы):** App-уровневый интеграционный тест (401-bridge сквозь App, catch-all `*`→`/`) — половины юнит-покрыты, полный поток проверяется ручным смоуком (Task 8, дисциплина B); явный `navigate` в `Shell.onLogout` — самодостаточность logout (гейт — бэкстоп); `user?.username` — `?.` как страховка под гарантией гейта.
+
+- **Модульность бандла (требование Alexey, 2026-06-12):** вендор (`node_modules`) — отдельный chunk (`manualChunks`, функциональная форма — списочная не цепляет `react-dom/client`); экраны — ленивые chunk'и (`React.lazy`+`Suspense` в App.tsx). Итог сборки: `index` 4.5 kB (только наш код), `vendor` 231 kB (кэшируется, меняется редко), LoginPage/HomePage — свои файлы JS+CSS. Конвенция вписана в спеку §«Сквозные конвенции» — действует на все срезы.
 
 ## Что НЕ в этом плане (scope — не предлагать как findings)
 - Игровая доска, SSE-клиент, ход/undo (срез 2). Список/новая/восстановление (срез 3). Настройки+бэк `/settings` (срез 4). Админка+бэк-эндпоинты (срез 5). «Правила» (срез 6). PWA. Playwright/visual-regression/геометрия-тесты (отложены — тест-дисциплина B).

@@ -1,11 +1,13 @@
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { AuthProvider } from "./auth/AuthContext";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
 import { setUnauthorizedHandler } from "./api/client";
-import LoginPage from "./pages/LoginPage";
-import HomePage from "./pages/HomePage";
 import { Shell } from "./components/Shell";
+
+// экраны — ленивые chunk'и по роутам: каждый срез грузит своё, index не пухнет
+const LoginPage = lazy(() => import("./pages/LoginPage"));
+const HomePage = lazy(() => import("./pages/HomePage"));
 
 function UnauthorizedBridge() {
   const navigate = useNavigate();
@@ -23,15 +25,17 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <UnauthorizedBridge />
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route element={<ProtectedRoute />}>
-            <Route element={<Shell />}>
-              <Route path="/" element={<HomePage />} />
+        <Suspense fallback={<div>Загрузка…</div>}>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route element={<ProtectedRoute />}>
+              <Route element={<Shell />}>
+                <Route path="/" element={<HomePage />} />
+              </Route>
             </Route>
-          </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
       </AuthProvider>
     </BrowserRouter>
   );

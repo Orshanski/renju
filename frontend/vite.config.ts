@@ -10,6 +10,14 @@ export default defineConfig({
     outDir: "dist",
     modulePreload: { polyfill: false }, // CSP: убрать inline polyfill-скрипт (цель — современный Safari)
     assetsInlineLimit: 0, // CSP: не инлайнить ассеты
+    rollupOptions: {
+      output: {
+        // модульность бандла: ВЕСЬ вендор (node_modules) отдельным chunk'ом, index — только наш код;
+        // экраны грузятся ленивыми chunk'ами по роутам (React.lazy в App.tsx).
+        // Функциональная форма: списочная ("react-dom") не цепляет subpath-импорты вида react-dom/client.
+        manualChunks: (id) => (id.includes("node_modules") ? "vendor" : undefined),
+      },
+    },
   },
   test: { environment: "jsdom", globals: true, setupFiles: ["./src/test/setup.ts"], css: true },
 });
