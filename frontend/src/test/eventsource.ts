@@ -33,12 +33,14 @@ export class FakeEventSource {
 
   /** Доставить именованное SSE-событие (data — объект {seq,type,payload}, сериализуется как на проводе). */
   emit(type: string, data: unknown) {
+    if (this.readyState === 2) return; // закрытый стрим молчит, как настоящий
     const e = new MessageEvent(type, { data: JSON.stringify(data) });
     this.listeners.get(type)?.forEach((fn) => fn(e));
   }
 
   /** Имитация разрыва соединения. */
   fail() {
+    if (this.readyState === 2) return;
     this.onerror?.(new Event("error"));
   }
 }
