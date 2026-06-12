@@ -150,3 +150,72 @@ async def test_advance_engine_black_forbidden_move_errors():
     await svc.advance(g)  # не должно бросить
     assert g.status == "opponent_thinking"
     assert any(e["type"] == "error" for e in svc._hub._log.get(g.id, []))
+
+
+async def test_submit_move_then_engine_replies_via_advance():
+    svc = _svc()
+    g = await svc.create_game(owner_id=1, opponent_level="master", human_color="white")
+    svc._adapter.move = (5, 5)
+    g = await svc.submit_move(g.id, user_id=1, point=(6, 6))  # ход 2 белые (человек)
+    assert g.moves == [[7, 7], [6, 6]] and g.status == "opponent_thinking"  # ждём движок
+    await svc.advance(g)  # «фон»: движок-чёрный ходит 3-м
+    assert g.moves == [[7, 7], [6, 6], [5, 5]] and g.status == "awaiting_move"
+
+
+async def test_submit_not_your_turn_pvp_form():
+    import pytest
+
+    from app.domain.values import MoveRejected, MoveRejectReason
+    from app.models.game import Game
+
+    svc = _svc()
+    g = Game(
+        id="g",
+        owner_id=1,
+        moves=[[7, 7]],
+        undo_count=0,
+        forbidden_log={},
+        controllers={
+            "black": {"kind": "user", "user_id": 1},
+            "white": {"kind": "user", "user_id": 2},
+        },
+        status="awaiting_move",
+    )
+    await svc._repo.create(g)
+    # ход 2 = белые = user 2; чёрный (user 1, участник) подаёт не в свою очередь
+    with pytest.raises(MoveRejected) as e:
+        await svc.submit_move("g", user_id=1, point=(6, 6))
+    assert e.value.reason is MoveRejectReason.NOT_YOUR_TURN
+
+
+async def test_submit_foreign_user_not_found():
+    import pytest
+
+    from app.exceptions import NotFoundError
+
+    svc = _svc()
+    g = await svc.create_game(owner_id=1, opponent_level="master", human_color="black")
+    with pytest.raises(NotFoundError):  # user 2 не участник одиночной HvE-партии
+        await svc.submit_move(g.id, user_id=2, point=(6, 6))
+
+
+async def test_undo_pure_replay_no_engine():
+    svc = _svc()
+    g = await svc.create_game(owner_id=1, opponent_level="master", human_color="white")
+    svc._adapter.move = (6, 6)
+    g = await svc.submit_move(g.id, user_id=1, point=(8, 8))  # ход 2 белые (реальный ход человека)
+    await svc.advance(g)  # «фон»: движок-чёрный ходит 3-м → [[7,7],[8,8],[6,6]]
+    assert g.moves == [[7, 7], [8, 8], [6, 6]]
+    # форбиды позиций уже в forbidden_log → undo без движка
+    svc._adapter.calls = 0
+    orig = svc._adapter.forbidden_points
+
+    async def counting(m):
+        svc._adapter.calls += 1
+        return await orig(m)
+
+    svc._adapter.forbidden_points = counting
+    g = await svc.undo(g.id, user_id=1)
+    # откат белых: снимаем ход 3 (движок) и ход 2 (человек) → назад к [[7,7]]
+    assert g.moves == [[7, 7]] and "2" not in g.forbidden_log and "3" not in g.forbidden_log
+    assert svc._adapter.calls == 0  # undo без движка

@@ -1,16 +1,20 @@
 import uuid
 from collections.abc import Sequence
 
+from app.domain.game import undo_truncate
 from app.domain.opening import CENTER
 from app.domain.rules import outcome_after
+from app.domain.undo import UndoPolicy, check_undo
 from app.domain.values import (
     Color,
     GameStatus,
     MoveRejected,
+    MoveRejectReason,
     Point,
     color_of_move,
     color_to_move,
 )
+from app.exceptions import NotFoundError
 from app.game.controllers import Engine, User, controller_from_json, controller_to_json
 from app.game.players import Player, make_player
 from app.game_service import apply_move
@@ -127,3 +131,66 @@ class GameService:
                 },
             )
             await self._repo.update(game)
+
+    async def _load_owned(self, game_id: str, user_id: int) -> Game:
+        game = await self._repo.get(game_id)
+        if game is None or user_id not in self._controller_user_ids(game):
+            raise NotFoundError("Game not found")
+        return game
+
+    def _controller_user_ids(self, game: Game) -> set[int]:
+        out: set[int] = set()
+        for c in game.controllers.values():
+            ctl = controller_from_json(c)
+            if isinstance(ctl, User):
+                out.add(ctl.user_id)
+        return out
+
+    async def submit_move(self, game_id: str, user_id: int, point: Point) -> Game:
+        game = await self._load_owned(game_id, user_id)
+        if game.status != GameStatus.AWAITING_MOVE.value:
+            raise MoveRejected(MoveRejectReason.OPPONENT_THINKING)
+        moves = [tuple(m) for m in game.moves]
+        side = color_to_move(len(moves))
+        ctl = controller_from_json(game.controllers[side.value])
+        if not (isinstance(ctl, User) and ctl.user_id == user_id):
+            raise MoveRejected(MoveRejectReason.NOT_YOUR_TURN)
+        fb = await self.fouls(game, moves)  # из лога (записан advance'ом), без движка
+        game.moves = [list(p) for p in apply_move(moves, point, forbidden=fb)]
+        self._hub.publish(
+            game.id,
+            "move",
+            {
+                "by": color_of_move(len(game.moves) - 1).value,
+                "point": list(point),
+                "move_index": len(game.moves) - 1,
+            },
+        )
+        game.status = self._next_status(game, [tuple(m) for m in game.moves])
+        if GameStatus(game.status).is_finished:  # ход человека завершил партию — фона не будет
+            self._hub.publish(game.id, "status", {"status": game.status})
+        await self._repo.update(game)
+        return game  # advance НЕ здесь: при opponent_thinking роутер запланирует фоновый прогон
+
+    async def undo(self, game_id: str, user_id: int) -> Game:
+        game = await self._load_owned(game_id, user_id)
+        check_undo(
+            policy=UndoPolicy(),
+            status=GameStatus(game.status),
+            undo_count=game.undo_count,
+        )
+        my_side = next(
+            s for s, c in game.controllers.items() if controller_from_json(c) == User(user_id)
+        )
+        new_moves = undo_truncate(moves=[tuple(m) for m in game.moves], for_color=Color(my_side))
+        k = len(new_moves)
+        game.moves = [list(p) for p in new_moves]
+        game.forbidden_log = {key: v for key, v in game.forbidden_log.items() if int(key) <= k}
+        game.undo_count += 1
+        game.status = GameStatus.AWAITING_MOVE.value
+        self._hub.publish(game.id, "undo", {"move_count": k})
+        fb = await self.fouls(game, new_moves)  # из лога (replay), без движка
+        if fb:
+            self._hub.publish(game.id, "forbidden", {"points": [list(p) for p in fb]})
+        await self._repo.update(game)
+        return game
