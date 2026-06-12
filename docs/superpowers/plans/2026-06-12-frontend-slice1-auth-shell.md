@@ -623,6 +623,7 @@ export default function LoginPage() {
 
   async function onSubmit(e: SyntheticEvent) {
     e.preventDefault();
+    if (busy) return; // гард двойного сабмита: Enter повторно, пока идёт запрос
     setBusy(true);
     setError("");
     try {
