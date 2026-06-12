@@ -56,5 +56,5 @@ async def test_winning_line_null_while_game_running_and_after_undo(
 
     un = (
         await client.post(f"/api/games/{gid}/undo")
-    ).json()  # дефолтная политика: после конца можно  # noqa: E501
+    ).json()  # дефолтная политика: после конца можно
     assert un["status"] == "awaiting_move" and un["winning_line"] is None
