@@ -10,7 +10,7 @@
 
 **Спека:** `docs/superpowers/specs/2026-06-12-frontend-slice1-auth-shell-design.md`.
 
-**Команды:** фронт — из `frontend/`: `npm run dev` (Vite+прокси), `npm run build`, `npm test` (Vitest), `npm run typecheck` (`tsc --noEmit`), `npm run lint`. Бэк — из `backend/`: `uv run pytest -q`. **Один origin:** dev — Vite-прокси `/api`→бэк; prod — бэк отдаёт статику.
+**Команды:** фронт — из `frontend/`: `npm run build`, `npm test` (Vitest), `npm run typecheck` (`tsc --noEmit`). Бэк — из `backend/`: `uv run pytest -q`. **Один origin:** бэк отдаёт статику (`StaticFiles` на собранный `dist/`) — и в деве, и в проде. ESLint не используем (решение Alexey 2026-06-12) — типовую дисциплину держит `tsc` strict.
 
 ---
 
@@ -62,8 +62,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit",
-    "lint": "eslint ."
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "react": "^19.1.0",
@@ -78,11 +77,9 @@
     "@types/react-dom": "^19.1.0",
     "@vitejs/plugin-react": "^4.4.1",
     "@vitest/coverage-v8": "^4.1.5",
-    "eslint": "^9.0.0",
     "jsdom": "^26.0.0",
     "msw": "^2.14.2",
     "typescript": "^5.8.3",
-    "typescript-eslint": "^8.0.0",
     "vite": "^6.3.5",
     "vitest": "^4.1.2"
   }
@@ -919,23 +916,11 @@ async def test_existing_api_get_wins_over_catchall(spa_client):
 
 ---
 
-## Task 8: Линт фронта + ручной smoke (живой вход)
+## Task 8: Финальная проверка + ручной smoke (живой вход)
 
-**Files:** Create `frontend/eslint.config.js`; ручной smoke.
+**Files:** нет новых — финальные прогоны + ручной smoke.
 
-- [ ] **Step 1: `frontend/eslint.config.js`** (flat-config, TS + React-hooks базово)
-```js
-import js from "@eslint/js";
-import tseslint from "typescript-eslint";
-
-export default tseslint.config(
-  { ignores: ["dist", "coverage"] },
-  js.configs.recommended,
-  ...tseslint.configs.recommended,
-  { languageOptions: { ecmaVersion: 2022, sourceType: "module" } },
-);
-```
-Доустановить dev-deps: `cd frontend && npm i -D @eslint/js`. `npm run lint` — чисто (поправить тривиальные замечания).
+> **ESLint не используем** (решение Alexey 2026-06-12, снят из задачи): отдельный линтер фронту не нужен, типовую дисциплину держит `tsc --noEmit` strict (как в librarium, где фронт тоже без eslint).
 - [ ] **Step 2: Полная проверка фронта.** `npm run typecheck` (0), `npm test` (все зелёные), `npm run build` (успех), `grep -nE "<script>[^<]|<style|style=|onload=" dist/index.html` → пусто (CSP-чистота).
 - [ ] **Step 3: Ручной smoke (Alexey-делегировано — я сам).** Два терминала:
 ```bash
@@ -953,13 +938,13 @@ RENJU_DATA_DIR=/tmp/renju-fe uv run alembic upgrade head && RENJU_DATA_DIR=/tmp/
 6. Неверный пароль → inline «Неверные имя или пароль», поле пароля очищено, без редиректа.
 - [ ] **Step 3b: Tailscale-проверка (прод-режим).** С iPad (`ipad1410`) по тайлнету: открыть `http://macbook-pro-orshanski.tail0972f1.ts.net:8000/` (или `http://100.93.96.5:8000/`) → та же страница рендерится, логин работает, **консоль без CSP-violation** (CSP — `'self'`, same-origin, к хосту не привязан; cookie `secure=False` → проходит по http). Подтверждает критерий «iPad-первичный» из спеки вживую.
 > Отдельного Vite-dev-сервер-смоука нет: фронт доставляет бэк (Step 3/3b — единственный путь). Vite-dev-сервер из модели убран.
-- [ ] **Step 4: Финал.** Полный фронт-прогон + бэк-прогон зелёные. Коммит (если правки линта): `git commit -m "chore(rj-0z2): eslint фронта + smoke-проверка"`.
+- [ ] **Step 4: Финал.** Полный фронт-прогон + бэк-прогон зелёные.
 
 ---
 
 ## Self-Review (проведено)
 
-- **Покрытие спеки:** scaffold+CSP-чистая сборка (T1) · api-клиент CSRF/401/login-исключение (T2) · AuthContext me(200/401/500)/login(разворот .user)/logout (T3) · ProtectedRoute-гейт (T4) · LoginPage форма+401/429/500 (T5) · Shell+HomePage+App-роутинг+401-провод+респонсив @900 (T6) · бэк раздаёт SPA+fallback+/api→404 (T7) · линт+ручной smoke с CSP-чек (T8). Все разделы спеки имеют задачу.
+- **Покрытие спеки:** scaffold+CSP-чистая сборка (T1) · api-клиент CSRF/401/login-исключение (T2) · AuthContext me(200/401/500)/login(разворот .user)/logout (T3) · ProtectedRoute-гейт (T4) · LoginPage форма+401/429/500 (T5) · Shell+HomePage+App-роутинг+401-провод+респонсив @900 (T6) · бэк раздаёт SPA+fallback+/api→404 (T7) · финальная проверка+ручной smoke с CSP-чек (T8, без eslint — решение Alexey). Все разделы спеки имеют задачу.
 - **CSP-чистота:** `modulePreload.polyfill=false`+`assetsInlineLimit=0`+index.html без inline (T1), grep-проверка (T1/T8), смоук-критерий «консоль без violation» (T8). Стили — только CSS Modules (внешний CSS).
 - **Формы ответов (M1):** login разворачивает `.user` (T3 `auth.api.ts`), me — плоско; тип `User={id,username,role}` (T3).
 - **401-развязка (N1):** глобальный перехват с `skipAuthRedirect`; логин помечен `skipAuthRedirect` (T2 тест + T3 `apiLogin`); 429/прочее → свой текст (T5).
