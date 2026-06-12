@@ -94,6 +94,10 @@ export default function GamePage() {
               <span className={styles.k}>Ход</span>
               <span className={styles.v}>№{view.moves.length}</span>
             </div>
+            <div className={styles.kv}>
+              <span className={styles.k}>Запрещённые</span>
+              <span className={styles.legendForbid}>подсвечены ✕</span>
+            </div>
           </div>
           <div className={styles.controls}>
             <button type="button" className={styles.undoBtn} disabled={!canUndo(view)} onClick={() => void undoMove()}>
