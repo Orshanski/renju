@@ -6,8 +6,8 @@ import type { GameView } from "./view";
 export const BOARD_SIZE = 15;
 const CX = 7; // центр (7,7) предзаполнен при создании партии
 
-export function colorToMove(movesCount: number): Color {
-  return movesCount % 2 === 0 ? "black" : "white";
+export function colorToMove(moveCount: number): Color {
+  return moveCount % 2 === 0 ? "black" : "white";
 }
 
 export function openingZone(moveCount: number): Point[] | null {
@@ -27,6 +27,7 @@ export function canPlay(view: GameView, point: Point): boolean {
   if (view.status !== "awaiting_move" || view.pendingIndex !== null) return false;
   if (view.yourColor === null || colorToMove(view.moves.length) !== view.yourColor) return false;
   if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) return false;
+  // forbidden непуст ТОЛЬКО на ходу чёрных (сервер шлёт фолы лишь для чёрной позиции) — безусловная проверка эквивалентна серверному гейту «фол только чёрным»
   if (has(view.moves, point) || has(view.forbidden, point)) return false;
   const zone = openingZone(view.moves.length);
   return zone === null || has(zone, point);

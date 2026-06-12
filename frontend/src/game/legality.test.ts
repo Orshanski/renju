@@ -60,6 +60,7 @@ describe("canPlay", () => {
     expect(canPlay(v({ pendingIndex: 1 }), [8, 7])).toBe(false);
   });
   it("за доской — нельзя", () => expect(canPlay(v({}), [15, 0] as Point)).toBe(false));
+  it("yourColor=null (наблюдатель) — нельзя", () => expect(canPlay(v({ yourColor: null }), [8, 7])).toBe(false));
 });
 
 describe("canUndo (зеркало undo_truncate: чёрным нужно ≥3 камней, белым ≥2)", () => {
@@ -76,6 +77,7 @@ describe("canUndo (зеркало undo_truncate: чёрным нужно ≥3 к
     expect(canUndo(v({ status: "finished_black", moves: [[7, 7], [6, 6], [8, 8]] }))).toBe(true);
     expect(canUndo(v({ pendingIndex: 2, moves: [[7, 7], [6, 6], [8, 8]] }))).toBe(false);
   });
+  it("yourColor=null — нельзя", () => expect(canUndo(v({ yourColor: null, moves: [[7, 7], [6, 6], [8, 8]] }))).toBe(false));
 });
 
 describe("pointLabel", () => {
