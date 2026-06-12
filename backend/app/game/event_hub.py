@@ -22,7 +22,7 @@ class InMemoryEventHub:
 
     async def subscribe(
         self, game_id: str, since: int, idle_timeout: float | None = None
-    ) -> AsyncGenerator[dict, None]:  # noqa: UP043
+    ) -> AsyncGenerator[dict]:
         cur = self._seq.get(game_id, 0)
         if since > cur:  # курсор «из будущего» — недостижим
             yield {"seq": cur, "type": "reset", "payload": {}}

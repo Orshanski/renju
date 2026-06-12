@@ -1315,6 +1315,6 @@ RENJU_DATA_DIR=/tmp/renju-s2 uv run uvicorn app.app_factory:create_app --factory
 
 ## Что НЕ в этом плане (scope — не предлагать как findings)
 
-- durable `sse_events` (реплей через рестарт), мгновенный teardown-реестр SSE на бампе epoch — отдельный тикет (решение A).
+- durable `sse_events` (реплей через рестарт), мгновенный teardown-реестр SSE на бампе epoch — отдельный тикет (решение A). Сюда же — **реклейм/эвикция `EventHub`-буфера**: in-memory `_log`/`_seq`/`_subs` по завершённым партиям не освобождаются (на партию буфер ограничен ≤ пары сотен событий — спека §«Контракт SSE», но между партиями копится при долгоживущем процессе). Для MVP приемлемо; вытеснение/TTL едут с durable-impl.
 - PvP-матчмейкинг (opponent `kind:"user"`), per-user undo-настройки (`/settings`), фронт.
 - Калибровка уровней, admin engine-config.
