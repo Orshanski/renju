@@ -1,0 +1,5 @@
+/* Глобальный минимум БЕЗ токенов: бокс-модель и высоты (обычный css — side-effect-импорт
+   из main.tsx не tree-shake'ится). Всё визуальное — в модулях экранов (изоляция). */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #root { height: 100%; }
+body { -webkit-font-smoothing: antialiased; }

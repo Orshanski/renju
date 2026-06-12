@@ -28,13 +28,13 @@ it("показывает имя пользователя и контент", asy
   expect(screen.getByText("HOME")).toBeInTheDocument();
 });
 
-it("клик «выход» → logout → редирект на /login", async () => {
+it("клик «выйти» → logout → редирект на /login", async () => {
   server.use(
     http.get("/api/auth/me", () => HttpResponse.json({ id: 1, username: "alice", role: "user" })),
     http.post("/api/auth/logout", () => HttpResponse.json({ ok: true })),
   );
   tree();
   await waitFor(() => expect(screen.getByText("alice")).toBeInTheDocument());
-  await userEvent.click(screen.getByRole("button", { name: /выход/i }));
+  await userEvent.click(screen.getByRole("button", { name: /выйти/i })); // текст кнопки — по прототипу
   await waitFor(() => expect(screen.getByText("LOGIN")).toBeInTheDocument());
 });

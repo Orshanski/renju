@@ -2,6 +2,7 @@ import { Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import styles from "./Shell.module.css";
 
+// Каркас — по prototype/index.html §App chrome (бренд + юзерчип; табы появятся со срезами 2–5).
 export function Shell() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -13,11 +14,17 @@ export function Shell() {
 
   return (
     <div className={styles.shell}>
-      <header className={styles.header}>
-        <span className={styles.brand}>Рэндзю</span>
-        <div className={styles.right}>
-          <span>{user?.username}</span>{/* ?. — гейт ProtectedRoute гарантирует user; страховка, не флоу */}
-          <button className={styles.logout} onClick={onLogout}>Выход</button>
+      <header className={styles.bar}>
+        <div className={styles.brand}>
+          <span className={styles.kanji}>連珠</span>
+          <span className={styles.lat}>Renju</span>
+        </div>
+        <div className={styles.spacer} />
+        <div className={styles.userchip}>
+          {/* ?. — гейт ProtectedRoute гарантирует user; страховка, не флоу */}
+          <span className={styles.av}>{user?.username.charAt(0).toUpperCase()}</span>
+          <span>{user?.username}</span>
+          <button className={styles.linkbtn} onClick={onLogout}>выйти</button>
         </div>
       </header>
       <main className={styles.main}><Outlet /></main>
