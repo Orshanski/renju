@@ -11,10 +11,10 @@ import asyncio
 from collections.abc import Sequence
 from pathlib import Path
 
-from app.domain.engine_params import EngineParams
-from app.domain.values import BOARD_SIZE, Point
-from app.rapfi.process import EngineProcessDied, RapfiProcess
-from app.rapfi.protocol import (
+from ..domain.engine_params import EngineParams
+from ..domain.values import BOARD_SIZE, Point
+from .process import EngineProcessDied, RapfiProcess
+from .protocol import (
     LineKind,
     ParsedLine,
     ProtocolError,

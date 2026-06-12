@@ -3,16 +3,16 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.config import Settings
-from app.db.engine import make_engine
-from app.db.session import make_sessionmaker
-from app.error_handlers import register_error_handlers
-from app.middleware.csrf import add_csrf_guard
-from app.middleware.refresh import add_refresh
-from app.middleware.security_headers import add_security_headers
-from app.routers import admin as admin_router
-from app.routers import auth as auth_router
-from app.routers import games as games_router
+from .config import Settings
+from .db.engine import make_engine
+from .db.session import make_sessionmaker
+from .error_handlers import register_error_handlers
+from .middleware.csrf import add_csrf_guard
+from .middleware.refresh import add_refresh
+from .middleware.security_headers import add_security_headers
+from .routers import admin as admin_router
+from .routers import auth as auth_router
+from .routers import games as games_router
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -20,10 +20,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        from app.config import REPO_ROOT
-        from app.game.event_hub import InMemoryEventHub
-        from app.levels_config import load_levels
-        from app.rapfi.adapter import RapfiAdapter
+        from .config import REPO_ROOT
+        from .game.event_hub import InMemoryEventHub
+        from .levels_config import load_levels
+        from .rapfi.adapter import RapfiAdapter
 
         engine = make_engine(settings)
         app.state.engine = engine

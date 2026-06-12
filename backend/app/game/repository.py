@@ -3,7 +3,7 @@ from typing import Protocol
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.game import Game
+from ..models.game import Game
 
 
 class GameRepository(Protocol):

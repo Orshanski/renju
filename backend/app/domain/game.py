@@ -2,8 +2,8 @@
 
 from collections.abc import Sequence
 
-from app.domain.opening import opening_zone
-from app.domain.values import (
+from .opening import opening_zone
+from .values import (
     BOARD_SIZE,
     Color,
     MoveRejected,

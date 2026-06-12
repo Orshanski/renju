@@ -1,11 +1,11 @@
 import uuid
 from collections.abc import Sequence
 
-from app.domain.game import undo_truncate
-from app.domain.opening import CENTER
-from app.domain.rules import outcome_after
-from app.domain.undo import UndoPolicy, check_undo
-from app.domain.values import (
+from ..domain.game import undo_truncate
+from ..domain.opening import CENTER
+from ..domain.rules import outcome_after
+from ..domain.undo import UndoPolicy, check_undo
+from ..domain.values import (
     Color,
     GameStatus,
     MoveRejected,
@@ -14,12 +14,12 @@ from app.domain.values import (
     color_of_move,
     color_to_move,
 )
-from app.exceptions import NotFoundError
-from app.game.controllers import Engine, User, controller_from_json, controller_to_json
-from app.game.players import Player, make_player
-from app.game_service import apply_move
-from app.models.game import Game
-from app.rapfi.adapter import EngineError
+from ..exceptions import NotFoundError
+from ..game_service import apply_move
+from ..models.game import Game
+from ..rapfi.adapter import EngineError
+from .controllers import Engine, User, controller_from_json, controller_to_json
+from .players import Player, make_player
 
 
 class GameService:

@@ -1,7 +1,7 @@
 from sqlalchemy import func, select
 
-from app.auth import hash_password
-from app.models.user import User
+from ..auth import hash_password
+from ..models.user import User
 
 
 async def get_user_by_id(session, user_id: int) -> User | None:

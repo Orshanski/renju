@@ -1,7 +1,7 @@
 from fastapi import Request
 
-from app.config import Settings
-from app.db.session import session_scope
+from ..config import Settings
+from .session import session_scope
 
 
 async def get_session(request: Request):

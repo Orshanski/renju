@@ -1,8 +1,8 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from app.auth import AuthError
-from app.exceptions import (
+from .auth import AuthError
+from .exceptions import (
     BadInputError,
     ConflictError,
     ForbiddenError,
@@ -31,7 +31,7 @@ def register_error_handlers(app: FastAPI) -> None:
 
         app.add_exception_handler(exc_type, make(status))
 
-    from app.domain.values import MoveRejected, MoveRejectReason, UndoRejected, UndoRejectReason
+    from .domain.values import MoveRejected, MoveRejectReason, UndoRejected, UndoRejectReason
 
     def _rejected(_request: Request, exc: Exception) -> JSONResponse:
         reason = exc.reason  # type: ignore[attr-defined]

@@ -1,4 +1,4 @@
-from app.auth import create_token
+from ..auth import create_token
 
 
 def add_refresh(app):

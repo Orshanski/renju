@@ -1,6 +1,6 @@
 """Дебютная зона рэндзю (RIF Уровень 1). Чистая геометрия, без I/O, без ролей."""
 
-from app.domain.values import Point
+from .values import Point
 
 CENTER: Point = (7, 7)
 

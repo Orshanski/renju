@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from app.domain.values import GameStatus, UndoRejected, UndoRejectReason
+from .values import GameStatus, UndoRejected, UndoRejectReason
 
 
 @dataclass(frozen=True)

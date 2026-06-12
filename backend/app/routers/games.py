@@ -9,15 +9,15 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import CurrentUser, decode_token, fetch_token_epoch, get_current_user
-from app.db.deps import get_session
-from app.domain.values import GameStatus
-from app.exceptions import BadInputError
-from app.game.dtos import CreateGameBody, LevelDTO
-from app.game.repository import SqlGameRepository
-from app.game.service import GameService
-from app.levels_config import resolve_level
-from app.routers.auth import current_user
+from ..auth import CurrentUser, decode_token, fetch_token_epoch, get_current_user
+from ..db.deps import get_session
+from ..domain.values import GameStatus
+from ..exceptions import BadInputError
+from ..game.dtos import CreateGameBody, LevelDTO
+from ..game.repository import SqlGameRepository
+from ..game.service import GameService
+from ..levels_config import resolve_level
+from .auth import current_user
 
 logger = logging.getLogger("renju.games")
 router = APIRouter(prefix="/api", tags=["games"])
