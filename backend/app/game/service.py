@@ -189,7 +189,9 @@ class GameService:
         game.undo_count += 1
         game.status = GameStatus.AWAITING_MOVE.value
         self._hub.publish(game.id, "undo", {"move_count": k})
-        fb = await self.fouls(game, new_moves)  # из лога (replay), без движка
+        # из лога напрямую — undo структурно без движка (не через fouls, который
+        # на отсутствующем ключе чёрной позиции дёрнул бы forbidden_points)
+        fb = [tuple(p) for p in game.forbidden_log.get(str(k), [])]
         if fb:
             self._hub.publish(game.id, "forbidden", {"points": [list(p) for p in fb]})
         await self._repo.update(game)

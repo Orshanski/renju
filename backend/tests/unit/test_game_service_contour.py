@@ -219,3 +219,35 @@ async def test_undo_pure_replay_no_engine():
     # откат белых: снимаем ход 3 (движок) и ход 2 (человек) → назад к [[7,7]]
     assert g.moves == [[7, 7]] and "2" not in g.forbidden_log and "3" not in g.forbidden_log
     assert svc._adapter.calls == 0  # undo без движка
+
+
+async def test_undo_no_engine_even_with_sparse_log():
+    # структурная гарантия: undo не зовёт движок, даже если ключ форбидов позиции,
+    # на которую приземляется откат, НЕ мемоизирован (sparse log). Старый код (fouls)
+    # дёрнул бы forbidden_points на чёрной позиции; прямое чтение лога — нет.
+    from app.models.game import Game
+
+    svc = _svc()
+    svc._adapter.calls = 0
+    orig = svc._adapter.forbidden_points
+
+    async def counting(m):
+        svc._adapter.calls += 1
+        return await orig(m)
+
+    svc._adapter.forbidden_points = counting
+    g = Game(
+        id="g",
+        owner_id=1,
+        moves=[[7, 7], [8, 8], [9, 9], [10, 10]],
+        undo_count=0,
+        forbidden_log={},  # НАМЕРЕННО пусто — провоцируем движок у старого кода
+        controllers={
+            "black": {"kind": "user", "user_id": 1},
+            "white": {"kind": "engine", "level_id": "master"},
+        },
+        status="awaiting_move",
+    )
+    await svc._repo.create(g)
+    g2 = await svc.undo("g", user_id=1)  # откат чёрного: len4 → new_moves len2 (чёрная позиция)
+    assert g2.moves == [[7, 7], [8, 8]] and svc._adapter.calls == 0
