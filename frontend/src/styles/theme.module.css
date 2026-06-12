@@ -1,0 +1,17 @@
+/* Сквозные токены. Импорт-side-effect из main.tsx. :root не скоупится CSS-модулями → глобально.
+   Брейкпоинт компакта — 900px; CSS-переменные НЕ работают в @media-условиях, поэтому в каждом
+   модуле @media (max-width: 900px) стоит литерал, здесь — справочно. */
+:root {
+  --color-bg: #fff;
+  --color-muted: #888;
+  --color-border: #ddd;
+  --color-border-input: #ccc;
+  --color-border-soft: #eee;
+  --color-primary: #2d6cdf;
+  --color-on-primary: #fff;
+  --color-error: #c0392b;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --gap: 12px;
+  --pad: 24px;
+}
