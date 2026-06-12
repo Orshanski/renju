@@ -173,6 +173,31 @@ it("error-событие → ненавязчивое сообщение, сос
   expect(result.current.view?.moves).toHaveLength(2);
 });
 
+it("двойной onerror до истечения паузы → ровно один reconnect (таймер не утекает)", async () => {
+  server.use(meOk, http.get("/api/games/g1", () => HttpResponse.json(state())));
+  const { result } = renderHook(() => useGame("g1", 50));
+  await waitFor(() => expect(result.current.view).not.toBeNull());
+  const first = FakeEventSource.last();
+  act(() => {
+    first.fail();
+    first.readyState = 1; // онемевший close() обходим, чтобы второй fail дошёл (моделируем повторный onerror)
+    first.fail();
+  });
+  await waitFor(() => expect(FakeEventSource.instances).toHaveLength(2)); // один новый стрим
+  await new Promise((r) => setTimeout(r, 150)); // даём «осиротевшему» таймеру шанс сработать
+  expect(FakeEventSource.instances).toHaveLength(2); // третьего не появилось
+});
+
+it("unmount при висящем reconnect-таймере → таймер погашен, новый стрим не открывается", async () => {
+  server.use(meOk, http.get("/api/games/g1", () => HttpResponse.json(state())));
+  const { result, unmount } = renderHook(() => useGame("g1", 50));
+  await waitFor(() => expect(result.current.view).not.toBeNull());
+  act(() => FakeEventSource.last().fail());
+  unmount(); // таймер ещё не истёк
+  await new Promise((r) => setTimeout(r, 150));
+  expect(FakeEventSource.instances).toHaveLength(1); // reconnect не случился
+});
+
 it("размонтирование закрывает стрим", async () => {
   server.use(http.get("/api/games/g1", () => HttpResponse.json(state())));
   const { result, unmount } = renderHook(() => useGame("g1", 0));

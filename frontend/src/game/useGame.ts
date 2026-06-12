@@ -54,6 +54,7 @@ export function useGame(gameId: string, reconnectDelayMs = 3000) {
       }
       es.onerror = () => {
         es.close();
+        if (timerRef.current) clearTimeout(timerRef.current); // повторный onerror не делает старый таймер неотменяемым
         timerRef.current = setTimeout(() => {
           void (async () => {
             try {
@@ -100,7 +101,8 @@ export function useGame(gameId: string, reconnectDelayMs = 3000) {
         await postMove(gameId, x, y); // 202; подтверждение — своё SSE-move (могло прийти раньше ответа)
       } catch {
         if (!aliveRef.current) return;
-        if (viewRef.current?.pendingIndex !== null) {
+        // view здесь заведомо не null (placePending выше), но пишем явно — ?.-форма давала бы true и при null
+        if (viewRef.current !== null && viewRef.current.pendingIndex !== null) {
           // ещё не подтверждён → рассинхрон: откат + истина с сервера (спека, доктрина отказов)
           setNotice("Доска обновлена — ход не прошёл");
           await resync();
