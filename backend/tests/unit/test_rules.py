@@ -10,6 +10,17 @@ def interleave(blacks: list[Point], whites: list[Point]) -> list[Point]:
     return moves
 
 
+def draw_position() -> tuple[list[Point], list[Point]]:
+    """Полная доска без пятёрки: раскраска цвет(x,y) = (x + 2y) % 4 < 2 — максимум
+    2 подряд в любом из 4 направлений (горизонталь BBWW…, вертикаль BWBW…,
+    диагонали BWWB…). NB: раскраска 2×2-блоками (x//2+y//2)%2 НЕ подходит —
+    на главной диагонали (k,k) она даёт один цвет на все 15 клеток.
+    """
+    blacks = [(x, y) for y in range(BOARD_SIZE) for x in range(BOARD_SIZE) if (x + 2 * y) % 4 < 2]
+    whites = [(x, y) for y in range(BOARD_SIZE) for x in range(BOARD_SIZE) if (x + 2 * y) % 4 >= 2]
+    return blacks, whites
+
+
 def test_empty_and_short_games_are_not_finished():
     assert outcome_after([]) is None
     assert outcome_after([(7, 7)]) is None
@@ -64,12 +75,7 @@ def test_win_detection_uses_only_last_move_color():
 
 
 def test_full_board_without_five_is_draw():
-    # Раскраска цвет(x,y) = (x + 2y) % 4 < 2: максимум 2 подряд в любом из
-    # 4 направлений (горизонталь BBWW…, вертикаль BWBW…, диагонали BWWB…).
-    # NB: раскраска 2×2-блоками (x//2+y//2)%2 НЕ подходит — на главной
-    # диагонали (k,k) она даёт один цвет на все 15 клеток.
-    blacks = [(x, y) for y in range(BOARD_SIZE) for x in range(BOARD_SIZE) if (x + 2 * y) % 4 < 2]
-    whites = [(x, y) for y in range(BOARD_SIZE) for x in range(BOARD_SIZE) if (x + 2 * y) % 4 >= 2]
+    blacks, whites = draw_position()
     assert len(blacks) == 113 and len(whites) == 112  # чёрные ходят первыми
     moves = interleave(blacks, whites)
     assert len(moves) == MAX_MOVES
@@ -110,8 +116,7 @@ def test_winning_line_none_for_black_overline():
 
 
 def test_winning_line_none_on_draw():
-    blacks = [(x, y) for y in range(BOARD_SIZE) for x in range(BOARD_SIZE) if (x + 2 * y) % 4 < 2]
-    whites = [(x, y) for y in range(BOARD_SIZE) for x in range(BOARD_SIZE) if (x + 2 * y) % 4 >= 2]
+    blacks, whites = draw_position()
     assert winning_line(interleave(blacks, whites)) is None  # ничья — линии нет
 
 
