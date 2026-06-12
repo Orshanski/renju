@@ -1,4 +1,4 @@
-from app.domain.rules import outcome_after
+from app.domain.rules import outcome_after, winning_line
 from app.domain.values import BOARD_SIZE, MAX_MOVES, GameStatus, Point
 
 
@@ -74,3 +74,54 @@ def test_full_board_without_five_is_draw():
     moves = interleave(blacks, whites)
     assert len(moves) == MAX_MOVES
     assert outcome_after(moves) is GameStatus.FINISHED_DRAW
+
+
+def test_winning_line_black_horizontal():
+    blacks = [(3, 7), (4, 7), (5, 7), (6, 7), (7, 7)]
+    whites = [(0, 0), (2, 0), (4, 0), (6, 0)]
+    line = winning_line(interleave(blacks, whites))
+    assert line == [(3, 7), (4, 7), (5, 7), (6, 7), (7, 7)]  # вдоль направления, по возрастанию
+
+
+def test_winning_line_black_diagonal():
+    blacks = [(3, 3), (4, 4), (5, 5), (6, 6), (7, 7)]
+    whites = [(0, 5), (0, 7), (0, 9), (0, 11)]
+    assert winning_line(interleave(blacks, whites)) == [(3, 3), (4, 4), (5, 5), (6, 6), (7, 7)]
+
+
+def test_winning_line_white_overline_last_move_mid_series():
+    # последний белый ход (7,5) — В СЕРЕДИНЕ серии: лучи в обе стороны, вся шестёрка
+    blacks = [(0, 0), (2, 0), (4, 0), (6, 0), (8, 0), (10, 0)]
+    whites = [(7, 2), (7, 3), (7, 4), (7, 6), (7, 7), (7, 5)]
+    line = winning_line(interleave(blacks, whites))
+    assert line == [(7, 2), (7, 3), (7, 4), (7, 5), (7, 6), (7, 7)]  # оверлайн целиком
+
+
+def test_winning_line_none_when_game_ongoing():
+    blacks = [(3, 7), (4, 7), (5, 7), (6, 7)]  # четвёрка — не победа
+    whites = [(0, 0), (2, 0), (4, 0)]
+    assert winning_line(interleave(blacks, whites)) is None
+
+
+def test_winning_line_none_for_black_overline():
+    blacks = [(2, 7), (3, 7), (4, 7), (6, 7), (7, 7), (5, 7)]  # шестёрка чёрных — не победа
+    whites = [(0, 0), (2, 0), (4, 0), (6, 0), (8, 0)]
+    assert winning_line(interleave(blacks, whites)) is None
+
+
+def test_winning_line_none_on_draw():
+    blacks = [(x, y) for y in range(BOARD_SIZE) for x in range(BOARD_SIZE) if (x + 2 * y) % 4 < 2]
+    whites = [(x, y) for y in range(BOARD_SIZE) for x in range(BOARD_SIZE) if (x + 2 * y) % 4 >= 2]
+    assert winning_line(interleave(blacks, whites)) is None  # ничья — линии нет
+
+
+def test_winning_line_double_closure_returns_first_direction():
+    # (7,7) замыкает И горизонталь, И вертикаль; _DIRECTIONS начинает с (1,0) → горизонталь
+    blacks = [(3, 7), (4, 7), (5, 7), (6, 7), (7, 3), (7, 4), (7, 5), (7, 6), (7, 7)]
+    whites = [(0, 0), (2, 0), (4, 0), (6, 0), (8, 0), (10, 0), (12, 0), (14, 0)]
+    line = winning_line(interleave(blacks, whites))
+    assert line == [(3, 7), (4, 7), (5, 7), (6, 7), (7, 7)]
+
+
+def test_winning_line_empty_moves():
+    assert winning_line([]) is None
