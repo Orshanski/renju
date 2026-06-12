@@ -155,7 +155,10 @@ class GameService:
         ctl = controller_from_json(game.controllers[side.value])
         if not (isinstance(ctl, User) and ctl.user_id == user_id):
             raise MoveRejected(MoveRejectReason.NOT_YOUR_TURN)
-        fb = await self.fouls(game, moves)  # из лога (записан advance'ом), без движка
+        # фолы из мемо-лога: при awaiting_move ключ str(len(moves)) гарантированно записан
+        # форвард-игрой (advance), поэтому движок здесь не дёргается. НЕ заменять на .get([])-
+        # дефолт: human-ход чёрных надо валидировать реальными фолами. (холистик 2026-06-12)
+        fb = await self.fouls(game, moves)
         game.moves = [list(p) for p in apply_move(moves, point, forbidden=fb)]
         self._hub.publish(
             game.id,

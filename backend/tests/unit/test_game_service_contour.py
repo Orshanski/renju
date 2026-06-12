@@ -299,3 +299,43 @@ async def test_undo_no_engine_even_with_sparse_log():
     await svc._repo.create(g)
     g2 = await svc.undo("g", user_id=1)  # откат чёрного: len4 → new_moves len2 (чёрная позиция)
     assert g2.moves == [[7, 7], [8, 8]] and svc._adapter.calls == 0
+
+
+async def test_eve_advance_drives_both_engine_sides():
+    # обе стороны Engine: advance двигает ОБЕ стороны до исхода (нейтральность, спека §Тестирование)
+    from app.models.game import Game
+
+    seq = [(6, 6), (6, 7), (7, 5), (8, 7), (8, 5), (9, 7), (9, 5), (5, 7)]
+
+    class _SeqAdapter:
+        def __init__(self):
+            self.i = 0
+
+        async def forbidden_points(self, moves):
+            return []
+
+        async def compute_move(self, moves, params, allowed_zone=None):
+            mv = seq[self.i]
+            self.i += 1
+            return mv
+
+        async def close(self):
+            pass
+
+    svc = _svc(adapter=_SeqAdapter())
+    g = Game(
+        id="g",
+        owner_id=1,
+        moves=[[7, 7]],
+        undo_count=0,
+        forbidden_log={},
+        controllers={
+            "black": {"kind": "engine", "level_id": "master"},
+            "white": {"kind": "engine", "level_id": "master"},
+        },
+        status="opponent_thinking",
+    )
+    await svc._repo.create(g)
+    await svc.advance(g)  # оба контролёра движок → advance двигает обе стороны
+    assert g.status == "finished_black"
+    assert len(g.moves) == 9  # 8 engine-ходов поверх предзаполненного центра
