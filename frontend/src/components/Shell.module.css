@@ -1,0 +1,9 @@
+/* токены — theme.module.css (Task 1 Step 6b) */
+.shell { min-height: 100vh; display: flex; flex-direction: column; }
+.header { display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 24px; border-bottom: 1px solid var(--color-border-soft); }
+.brand { font-weight: 600; }
+.right { display: flex; align-items: center; gap: var(--gap); }
+.logout { padding: 6px 12px; border: 1px solid var(--color-border-input); border-radius: var(--radius); cursor: pointer; background: var(--color-bg); }
+.main { flex: 1; padding: var(--pad); }
+@media (max-width: 900px) { .header { padding: 10px 12px; } .main { padding: 12px; } } /* компакт ≤900 */
