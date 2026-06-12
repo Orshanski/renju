@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..auth import CurrentUser, decode_token, fetch_token_epoch, get_current_user
 from ..db.deps import get_session
+from ..domain.rules import winning_line
 from ..domain.values import GameStatus
 from ..exceptions import BadInputError
 from ..game.dtos import CreateGameBody, LevelDTO
@@ -90,6 +91,11 @@ def _your_color(controllers: dict, user_id: int) -> str | None:
 
 def _state(game, user_id: int, hub) -> dict:
     fb = game.forbidden_log.get(str(len(game.moves)), [])
+    wl = (
+        winning_line([tuple(m) for m in game.moves])
+        if GameStatus(game.status).is_finished
+        else None
+    )
     return {
         "id": game.id,
         "owner_id": game.owner_id,
@@ -100,6 +106,7 @@ def _state(game, user_id: int, hub) -> dict:
         "undo_count": game.undo_count,
         "cursor": hub.cursor(game.id),
         "forbidden": fb,
+        "winning_line": [list(p) for p in wl] if wl is not None else None,
     }
 
 
