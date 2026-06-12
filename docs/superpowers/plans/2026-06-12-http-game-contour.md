@@ -1297,6 +1297,7 @@ RENJU_DATA_DIR=/tmp/renju-s2 uv run python -m scripts.create_admin root pw
 RENJU_DATA_DIR=/tmp/renju-s2 uv run uvicorn app.app_factory:create_app --factory --port 8099
 # curl: login → создать игру → GET → move → (SSE) увидеть ход движка событием → undo
 ```
+> **Покрытие SSE (решение по находке ревью Task 12, MINOR 2):** логика `gen()`→`subscribe`→реплей-из-буфера покрыта юнитом (`test_sse_replays_buffered_events`, прямой вызов хендлера — `httpx.ASGITransport` буферизует тело и на бесконечном стриме виснет); heartbeat-ping — юнитом хаба (`test_subscribe_heartbeat_ping_on_idle`, T5); проводка auth/доступ-отказа (401/404) — юнит-assertion'ами (`pytest.raises(AuthError|NotFoundError)`, добавлены по MINOR 1). **Реальный HTTP-провод SSE** (стриминг через сокет + middleware) покрыт **ручным curl-smoke** выше. Авто-тест SSE на живом uvicorn-сокете НЕ добавляем: threaded-uvicorn с кросс-loop координацией в async-pytest — непропорциональная инфра для self-hosted MVP; если SSE-регрессии станут болью — отдельный тикет.
 - [ ] **Step 4: Полный прогон + линт + тип.** `uv run pytest -q` · `uv run ruff check app tests scripts && uv run ruff format app tests scripts` · `uvx pyright` (0 errors).
 - [ ] **Step 5: Коммит** `git commit -m "test(rj-5c9): integration против живого движка"`.
 
