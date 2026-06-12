@@ -9,9 +9,10 @@ export async function apiLogin(username: string, password: string): Promise<User
   return resp.user;
 }
 
-// GET /me → User плоско
+// GET /me → User плоско. skipAuthRedirect: стартовый 401 = «не залогинен» (норма, тихо),
+// а не «сессия протухла» — редирект на /login делает ProtectedRoute, без глобального хендлера.
 export function apiMe(): Promise<User> {
-  return apiRequest<User>("GET", "/api/auth/me");
+  return apiRequest<User>("GET", "/api/auth/me", undefined, { skipAuthRedirect: true });
 }
 
 export async function apiLogout(): Promise<void> {

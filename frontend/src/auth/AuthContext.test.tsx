@@ -2,6 +2,7 @@ import { it, expect, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { server, http, HttpResponse } from "../test/msw";
+import { setUnauthorizedHandler } from "../api/client";
 import { AuthProvider, useAuth } from "./AuthContext";
 
 function Probe() {
@@ -29,6 +30,15 @@ it("на старте me=401 → user=none, без ошибки", async () => {
   server.use(me({ detail: "x" }, 401));
   render(<AuthProvider><Probe /></AuthProvider>);
   await waitFor(() => expect(screen.getByText("user:none")).toBeInTheDocument());
+});
+
+it("стартовый me=401 — тихий: глобальный 401-обработчик НЕ дёргается", async () => {
+  const onUnauthorized = vi.fn();
+  setUnauthorizedHandler(onUnauthorized);
+  server.use(me({ detail: "x" }, 401));
+  render(<AuthProvider><Probe /></AuthProvider>);
+  await waitFor(() => expect(screen.getByText("user:none")).toBeInTheDocument());
+  expect(onUnauthorized).not.toHaveBeenCalled(); // «не залогинен» — норма, не «сессия протухла»
 });
 
 it("на старте me=500 → user=none, без падения (не-401 → console.error)", async () => {
