@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -44,8 +45,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.bg_tasks = set()  # ссылки на фоновые advance-задачи (иначе GC оборвёт)
         app.state.advancing = set()  # game_id с активным фоновым advance (per-process дедуп)
         yield
-        for t in list(app.state.bg_tasks):  # погасить незавершённые фоновые advance
+        bg = list(app.state.bg_tasks)  # снимок: done-callback мутирует set по мере завершения
+        for t in bg:  # погасить незавершённые фоновые advance И дождаться отмены до dispose
             t.cancel()
+        if bg:
+            await asyncio.gather(*bg, return_exceptions=True)
         if app.state.adapter is not None:
             await app.state.adapter.close()
         await engine.dispose()
