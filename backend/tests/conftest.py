@@ -27,6 +27,7 @@ def rapfi_paths(settings):
 @pytest_asyncio.fixture
 async def engine(tmp_path, monkeypatch) -> AsyncIterator[AsyncEngine]:
     monkeypatch.setenv("RENJU_DATA_DIR", str(tmp_path))
+    import app.models.game  # noqa: F401
     import app.models.user  # noqa: F401 — регистрирует таблицу в metadata
     from app.config import Settings
     from app.db.base import Base
@@ -51,6 +52,7 @@ async def session(engine) -> AsyncIterator[AsyncSession]:
 @pytest_asyncio.fixture
 async def app(tmp_path, monkeypatch):
     monkeypatch.setenv("RENJU_DATA_DIR", str(tmp_path))
+    import app.models.game  # noqa: F401
     import app.models.user  # noqa: F401
     from app.app_factory import create_app
     from app.config import Settings
