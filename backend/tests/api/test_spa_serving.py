@@ -26,6 +26,7 @@ async def app_with_spa(tmp_path, monkeypatch):
 @pytest.fixture
 async def spa_client(app_with_spa):
     from httpx import ASGITransport, AsyncClient
+
     async with AsyncClient(transport=ASGITransport(app=app_with_spa), base_url="http://t") as c:
         yield c
 
