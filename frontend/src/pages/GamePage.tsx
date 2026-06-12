@@ -61,7 +61,7 @@ export default function GamePage() {
           {notice && (
             <div className={styles.notice} role="status">
               <span>{notice}</span>
-              <button type="button" className={styles.noticeClose} onClick={dismissNotice} aria-label="✕">
+              <button type="button" className={styles.noticeClose} onClick={dismissNotice} aria-label="Закрыть">
                 ✕
               </button>
             </div>

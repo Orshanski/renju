@@ -116,6 +116,25 @@ it("notice отображается и закрывается", async () => {
   await screen.findByText(/ты играешь/);
   act(() => FakeEventSource.last().emit("error", { seq: 8, type: "error", payload: { message: "x" } }));
   expect(await screen.findByRole("status")).toHaveTextContent("Движок споткнулся");
-  await userEvent.click(screen.getByRole("button", { name: "✕" }));
+  await userEvent.click(screen.getByRole("button", { name: /закрыть/i }));
   expect(screen.queryByRole("status")).not.toBeInTheDocument();
+});
+
+it("до резолва GET — «Загрузка…»", async () => {
+  let release!: () => void;
+  const gate = new Promise<void>((r) => { release = r; });
+  server.use(levels, http.get("/api/games/g1", async () => {
+    await gate;
+    return HttpResponse.json(state());
+  }));
+  renderPage();
+  expect(screen.getByText("Загрузка…")).toBeInTheDocument();
+  release();
+  expect(await screen.findByText(/ты играешь/)).toBeInTheDocument();
+});
+
+it("партия не найдена (404) → «Не удалось загрузить партию»", async () => {
+  server.use(levels, http.get("/api/games/g1", () => HttpResponse.json({ detail: "nf" }, { status: 404 })));
+  renderPage();
+  expect(await screen.findByText("Не удалось загрузить партию")).toBeInTheDocument();
 });
