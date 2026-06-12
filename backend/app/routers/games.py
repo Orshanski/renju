@@ -4,6 +4,7 @@ import random
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, FastAPI, Request
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import CurrentUser
@@ -149,4 +150,34 @@ async def get_game(
     game = await _service(request, session).get_game(game_id, user.user_id)
     if game.status == GameStatus.OPPONENT_THINKING.value:  # §4.8: застрявшая → доиграть фоном
         schedule_advance(request.app, game_id)
+    return _state(game, user.user_id, request.app.state.event_hub)
+
+
+class MoveBody(BaseModel):
+    x: int
+    y: int
+
+
+@router.post("/games/{game_id}/move", status_code=202)
+async def move(
+    game_id: str,
+    body: MoveBody,
+    request: Request,
+    user: Annotated[CurrentUser, Depends(current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+):
+    game = await _service(request, session).submit_move(game_id, user.user_id, (body.x, body.y))
+    if game.status == GameStatus.OPPONENT_THINKING.value:  # ход соперника-движка — в фоне
+        schedule_advance(request.app, game_id)
+    return {"accepted": True}  # 202: ход принят; ответ соперника придёт SSE-событием
+
+
+@router.post("/games/{game_id}/undo")
+async def undo(
+    game_id: str,
+    request: Request,
+    user: Annotated[CurrentUser, Depends(current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+):
+    game = await _service(request, session).undo(game_id, user.user_id)
     return _state(game, user.user_id, request.app.state.event_hub)
