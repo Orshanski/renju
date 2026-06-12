@@ -4,11 +4,11 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import CurrentUser, require_admin
-from app.db.deps import get_session
-from app.dtos.auth import UserDTO
-from app.routers.auth import current_user
-from app.services import admin_service
+from ..auth import CurrentUser, require_admin
+from ..db.deps import get_session
+from ..dtos.auth import UserDTO
+from ..services import admin_service
+from .auth import current_user
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 

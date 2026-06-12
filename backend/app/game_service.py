@@ -5,12 +5,12 @@
 
 from collections.abc import Sequence
 
-from app.domain.engine_params import EngineParams
-from app.domain.game import validate_move
-from app.domain.opening import CENTER, opening_zone
-from app.domain.rules import outcome_after
-from app.domain.values import MoveRejected, MoveRejectReason, Point
-from app.rapfi.adapter import RapfiAdapter
+from .domain.engine_params import EngineParams
+from .domain.game import validate_move
+from .domain.opening import CENTER, opening_zone
+from .domain.rules import outcome_after
+from .domain.values import MoveRejected, MoveRejectReason, Point
+from .rapfi.adapter import RapfiAdapter
 
 
 def new_game() -> list[Point]:

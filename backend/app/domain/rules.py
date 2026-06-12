@@ -2,7 +2,7 @@
 
 from collections.abc import Sequence
 
-from app.domain.values import MAX_MOVES, Color, GameStatus, Point, color_of_move
+from .values import MAX_MOVES, Color, GameStatus, Point, color_of_move
 
 _DIRECTIONS = ((1, 0), (0, 1), (1, 1), (1, -1))
 

@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import JSON, ForeignKey, func
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base
+from ..db.base import Base
 
 
 class Game(Base):

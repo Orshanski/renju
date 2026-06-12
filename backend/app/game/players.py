@@ -1,9 +1,9 @@
 from collections.abc import Sequence
 from typing import Protocol
 
-from app.domain.values import Point
-from app.game.controllers import Controller, User
-from app.game_service import engine_move
+from ..domain.values import Point
+from ..game_service import engine_move
+from .controllers import Controller, User
 
 
 class Player(Protocol):

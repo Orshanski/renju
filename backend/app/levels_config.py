@@ -4,7 +4,7 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
-from app.domain.engine_params import EngineParams
+from .domain.engine_params import EngineParams
 
 
 @dataclass(frozen=True)

@@ -1,7 +1,7 @@
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
-from app.config import Settings
+from ..config import Settings
 
 
 def make_engine(settings: Settings) -> AsyncEngine:

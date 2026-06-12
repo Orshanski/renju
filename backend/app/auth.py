@@ -8,8 +8,8 @@ import jwt
 from fastapi import Request
 from sqlalchemy import select, update
 
-from app.config import Settings
-from app.exceptions import ForbiddenError
+from .config import Settings
+from .exceptions import ForbiddenError
 
 log = logging.getLogger("renju.auth")
 _INVALID = "Invalid token"
@@ -66,14 +66,14 @@ class CurrentUser:
 
 
 async def fetch_token_epoch(session, user_id: int) -> int | None:
-    from app.models.user import User
+    from .models.user import User
 
     return await session.scalar(select(User.token_epoch).where(User.id == user_id))
 
 
 async def bump_token_epoch(session, user_id: int) -> int | None:
     """UPDATE … RETURNING; новый epoch или None если строки нет (guard на гонку reset×delete)."""
-    from app.models.user import User
+    from .models.user import User
 
     return await session.scalar(
         update(User)

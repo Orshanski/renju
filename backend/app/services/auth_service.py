@@ -1,9 +1,9 @@
 import time
 
-from app.auth import AuthError, create_token, verify_password
-from app.dal import users as dal
-from app.dtos.auth import UserDTO
-from app.exceptions import RateLimitError
+from ..auth import AuthError, create_token, verify_password
+from ..dal import users as dal
+from ..dtos.auth import UserDTO
+from ..exceptions import RateLimitError
 
 _MAX_ATTEMPTS = 5
 _WINDOW_SEC = 300
@@ -45,7 +45,7 @@ async def login(session, username: str, password: str, ip: str, settings) -> tup
 
 
 async def get_me(session, user_id: int) -> UserDTO:
-    from app.exceptions import NotFoundError
+    from ..exceptions import NotFoundError
 
     user = await dal.get_user_by_id(session, user_id)
     if user is None:
