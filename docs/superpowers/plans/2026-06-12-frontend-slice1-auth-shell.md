@@ -10,6 +10,8 @@
 
 **Спека:** `docs/superpowers/specs/2026-06-12-frontend-slice1-auth-shell-design.md`.
 
+> **Ревизия визуала и конвенций (2026-06-12, после смоука Alexey):** все экраны переведены на **`prototype/index.html`** — визуальный источник истины (васи/дерево/киноварь, 連珠, ханко), который первая редакция плана проигнорировала, выдумав свою серую форму. Код-снимки CSS/разметки в Task 1 Step 6b и Task 5/6 ниже отражают ДО-прототипное состояние и историчны; действующее — в коде (`frontend/src/**`) и спеке. Итоговые решения Alexey: **токены — `@value`** (`styles/tokens.module.css`, явные импорты в каждом модуле, брейкпоинт `bpCompact` — тоже токен; глобальный слой — только безтокенный `reset.css`); **шрифты — Google Fonts CDN** (`<link>` в index.html + точечное CSP-исключение style-src/font-src на два хоста Google); **инлайны:** React `style={{}}` работает под CSP (доказано вживую; блокируются только `style=""` в HTML и `<style>`-инжект css-in-js) — конвенция: дизайн в CSS-модулях, инлайн только для значений из данных; зерно васи — `grain.svg` (data:-URI CSP блокирует).
+
 **Команды:** фронт — из `frontend/`: `npm run build`, `npm test` (Vitest), `npm run typecheck` (`tsc --noEmit`). Бэк — из `backend/`: `uv run pytest -q`. **Один origin:** бэк отдаёт статику (`StaticFiles` на собранный `dist/`) — и в деве, и в проде. ESLint не используем (решение Alexey 2026-06-12) — типовую дисциплину держит `tsc` strict.
 
 ---
@@ -147,9 +149,11 @@ export default defineConfig({
 ```ts
 import "@testing-library/jest-dom/vitest";
 ```
-- [ ] **Step 6b: `frontend/src/styles/theme.module.css`** (сквозные токены — спека §«Сквозные конвенции»: «токены — один модуль/CSS-переменные», действуют на все срезы). `:root` CSS-модулями не скоупится → переменные глобальны; файл импортируется один раз в `main.tsx` (side-effect). Модули срезов (LoginPage/Shell/HomePage в Task 5–6) ссылаются на `var(--…)` вместо литералов.
+- [ ] **Step 6b: `frontend/src/styles/theme.css`** (сквозные токены — спека §«Сквозные конвенции», действуют на все срезы). **Обычный `.css`, НЕ `.module.css`:** side-effect-импорт CSS-модуля Vite выкидывает из прод-сборки (tree-shaking, экспорт не используется) — токены исчезали из живой страницы (поймано смоуком 2026-06-12: поля без рамок, кнопка без фона). Обычный css-импорт Vite не выкидывает никогда. Файл импортируется один раз в `main.tsx`; модули срезов (LoginPage/Shell/HomePage в Task 5–6) ссылаются на `var(--…)` вместо литералов.
 ```css
-/* Сквозные токены. Импорт-side-effect из main.tsx. :root не скоупится CSS-модулями → глобально.
+/* Сквозные токены (глобальный :root). НАРОЧНО обычный .css, не .module.css:
+   side-effect-импорт CSS-модуля Vite выкидывает из прод-сборки (tree-shaking) — токены исчезали.
+   Импортируется один раз из main.tsx.
    Брейкпоинт компакта — 900px; CSS-переменные НЕ работают в @media-условиях, поэтому в каждом
    модуле @media (max-width: 900px) стоит литерал, здесь — справочно. */
 :root {
@@ -178,7 +182,7 @@ export default function App() {
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
-import "./styles/theme.module.css"; // сквозные токены (side-effect, глобальный :root)
+import "./styles/theme.css"; // сквозные токены (глобальный :root; обычный css — модуль бы tree-shake'нулся)
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
