@@ -735,7 +735,7 @@ export function Shell() {
 
   async function onLogout() {
     await logout();
-    navigate("/login", { replace: true });
+    navigate("/login", { replace: true }); // явно: logout самодостаточен; ProtectedRoute-редирект — бэкстоп
   }
 
   return (
@@ -743,7 +743,7 @@ export function Shell() {
       <header className={styles.header}>
         <span className={styles.brand}>Рэндзю</span>
         <div className={styles.right}>
-          <span>{user?.username}</span>
+          <span>{user?.username}</span>{/* ?. — гейт ProtectedRoute гарантирует user; страховка, не флоу */}
           <button className={styles.logout} onClick={onLogout}>Выход</button>
         </div>
       </header>
@@ -779,7 +779,9 @@ function UnauthorizedBridge() {
   const navigate = useNavigate();
   useEffect(() => {
     // глобальный 401 (протухшая сессия в любой момент) → на логин. Логин-вызов исключён (skipAuthRedirect).
+    // navigate нестабилен (меняется на каждом переходе) → эффект пере-регистрирует хендлер свежим navigate.
     setUnauthorizedHandler(() => navigate("/login", { replace: true }));
+    return () => setUnauthorizedHandler(() => {}); // сброс при размонтировании — явный контракт, без висячего замыкания
   }, [navigate]);
   return null;
 }
@@ -968,6 +970,7 @@ RENJU_DATA_DIR=/tmp/renju-fe uv run alembic upgrade head && RENJU_DATA_DIR=/tmp/
 - **Ре-ревью (2-й свежий Opus), правки применены:** убран осиротевший `tsconfig.node.json` из Files (T1); снята избыточная правка корневого `.gitignore` — уже покрывает `node_modules/`/`dist/`/`frontend/dist/` (T1); реализован `theme.module.css` (токены) + side-effect-импорт в `main.tsx` + модули срезов переведены на `var(--…)` (T1/T5/T6) — закрыт задекларированный-но-не-созданный deliverable спеки §«Сквозные конвенции»; SPA-фикстура импортирует обе модели до `create_all` (T7); catch-all защищён от path-traversal (`is_relative_to(dist_root)`) + убраны мёртвые импорты `_Path`/`Request` (T7). Блокеров/мейджоров во 2-м проходе ревьюер не нашёл.
 - **Доставка и Tailscale (поправка Alexey):** фронт доставляет **бэк** (StaticFiles отдаёт собранный `dist/`) — Vite-dev-сервер из модели **убран** (`vite.config` без `server`-блока; Vite = только бандлер+тест-раннер). Доступ, включая Tailscale, — к **бэку**: `uvicorn --host 0.0.0.0` + явная проверка с iPad `http://macbook-pro-orshanski.tail0972f1.ts.net:8000/` (T8 Step 3/3b). CSP `'self'` к хосту не привязан, cookie `secure=False` → http по тайлнету проходит.
 - **tsconfig `vite/client` (поправка по LSP, сверено с librarium):** `"types"` включает `vite/client` (T1 Step 2) — ambient-объявления для side-effect/CSS-импортов (`*.module.css`) и `import.meta.env`; без него TS/LSP падал на `import "./styles/theme.module.css"`. (Ошибки LSP вида «Cannot find module react» — отдельное: TS-сервер не пере-сканировал свежий `frontend/node_modules`; `tsc --noEmit`=0 и `vite build` это опровергают.)
+- **Двухстадийное ревью по задачам (Sonnet impl + Opus spec+quality):** T2/T3/T5/T6 — Approved; минорные фиксы внесены (T2: сброс 401-обработчика в setup + тесты non-JSON/204; T3: тест useAuth-вне-провайдера + `Promise<void>`; T5: `FormEvent`→`SyntheticEvent`, гард двойного сабмита; T6: cleanup `UnauthorizedBridge`). **Сознательные KEEP (документированы):** App-уровневый интеграционный тест (401-bridge сквозь App, catch-all `*`→`/`) — половины юнит-покрыты, полный поток проверяется ручным смоуком (Task 8, дисциплина B); явный `navigate` в `Shell.onLogout` — самодостаточность logout (гейт — бэкстоп); `user?.username` — `?.` как страховка под гарантией гейта.
 
 ## Что НЕ в этом плане (scope — не предлагать как findings)
 - Игровая доска, SSE-клиент, ход/undo (срез 2). Список/новая/восстановление (срез 3). Настройки+бэк `/settings` (срез 4). Админка+бэк-эндпоинты (срез 5). «Правила» (срез 6). PWA. Playwright/visual-regression/геометрия-тесты (отложены — тест-дисциплина B).
