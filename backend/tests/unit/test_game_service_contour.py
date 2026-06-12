@@ -124,3 +124,29 @@ async def test_advance_engine_error_publishes_error_event():
     await svc.advance(g)  # движок падает → error-событие, статус НЕ меняется (§4.8 доиграет позже)
     assert g.status == "opponent_thinking"
     assert any(e["type"] == "error" for e in svc._hub._log.get(g.id, []))
+
+
+async def test_advance_engine_black_forbidden_move_errors():
+    # движок играет ЧЁРНЫМ и возвращает фол-точку → apply_move(FORBIDDEN) должно стать
+    # событием error, а не вылететь исключением; статус остаётся opponent_thinking
+    from app.models.game import Game
+
+    svc = _svc()
+    svc._adapter.forbid = [(5, 5)]
+    svc._adapter.move = (5, 5)  # движок возвращает ровно фол-точку
+    g = Game(
+        id="g",
+        owner_id=1,
+        moves=[[7, 7], [8, 8]],
+        undo_count=0,
+        forbidden_log={},
+        controllers={
+            "black": {"kind": "engine", "level_id": "master"},
+            "white": {"kind": "user", "user_id": 1},
+        },
+        status="opponent_thinking",
+    )
+    await svc._repo.create(g)
+    await svc.advance(g)  # не должно бросить
+    assert g.status == "opponent_thinking"
+    assert any(e["type"] == "error" for e in svc._hub._log.get(g.id, []))

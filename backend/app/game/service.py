@@ -3,7 +3,14 @@ from collections.abc import Sequence
 
 from app.domain.opening import CENTER
 from app.domain.rules import outcome_after
-from app.domain.values import Color, GameStatus, Point, color_of_move, color_to_move
+from app.domain.values import (
+    Color,
+    GameStatus,
+    MoveRejected,
+    Point,
+    color_of_move,
+    color_to_move,
+)
 from app.game.controllers import Engine, User, controller_from_json, controller_to_json
 from app.game.players import Player, make_player
 from app.game_service import apply_move
@@ -101,13 +108,15 @@ class GameService:
             await self._repo.update(game)
             try:
                 mv = await players[side].take_turn(moves)
-            except EngineError as e:  # сбой движка после ретрая → событие error, статус не трогаем
+                assert mv is not None  # engine-сторона всегда даёт ход (None только у Interactive)
+                # фолы только на ход чёрных (forbidden_points тоже может бросить EngineError)
+                fb = await self.fouls(game, moves) if side is Color.BLACK else []
+                game.moves = [list(p) for p in apply_move(moves, mv, forbidden=fb)]
+            except (EngineError, MoveRejected) as e:
+                # сбой движка ИЛИ нелегальный ход движка (фол-точка) → событие error,
+                # статус остаётся opponent_thinking; §4.8-восстановление доиграет при доступе
                 self._hub.publish(game.id, "error", {"message": str(e)})
-                return  # остаётся opponent_thinking; §4.8-восстановление доиграет при доступе
-            assert mv is not None  # engine-сторона всегда даёт ход (None только у Interactive)
-            # фолы только на ход чёрных
-            fb = await self.fouls(game, moves) if side is Color.BLACK else []
-            game.moves = [list(p) for p in apply_move(moves, mv, forbidden=fb)]
+                return
             self._hub.publish(
                 game.id,
                 "move",
