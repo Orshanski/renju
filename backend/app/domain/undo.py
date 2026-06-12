@@ -16,8 +16,8 @@ def check_undo(*, policy: UndoPolicy, status: GameStatus, undo_count: int) -> No
     """Бросает UndoRejected, если откат запрещён политикой или состоянием партии."""
     if not policy.enabled:
         raise UndoRejected(UndoRejectReason.DISABLED)
-    if status is GameStatus.ENGINE_THINKING:
-        raise UndoRejected(UndoRejectReason.ENGINE_THINKING)
+    if status is GameStatus.OPPONENT_THINKING:
+        raise UndoRejected(UndoRejectReason.OPPONENT_THINKING)
     if status.is_finished and not policy.after_game_end:
         raise UndoRejected(UndoRejectReason.GAME_FINISHED)
     if policy.limit is not None and undo_count >= policy.limit:

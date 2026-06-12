@@ -135,7 +135,7 @@ advance(game):
 
 ### Создание — `POST /api/games { opponent }`
 `opponent` задаёт контролёра **второй** стороны — параметр, не предположение. В срезе поддержан `{ kind: "engine", levelId }`; форма аддитивно расширяется на `{ kind: "user", userId }` (PvP) — логика назначения от вида не зависит.
-1. `current_user` → создатель. Для `kind == "engine"` валидировать `levelId` против `levels.toml` (неизвестный → 422).
+1. `current_user` → создатель. Для `kind == "engine"` валидировать `levelId` против `levels.toml` (неизвестный → `BadInputError`→400, единая модель ошибок среза 1).
 2. Назначить контролёров: создателю — **случайная** сторона (§4.6, выбора нет) как `{kind:"user", user_id: current_user.user_id}`, второй — из `opponent` (`{kind:"engine", level_id}`; позже user). `moves = [CENTER]`; `status = awaiting_move`; `forbidden_log = {}`.
 3. Сохранить. **`cursor` для ответа снять ЗДЕСЬ — до `advance`** (события `advance` получат `seq > cursor`, реплей их догонит; гонки create→подписка нет).
 4. Вызвать `advance` (ход 2 за движковой стороной → сервер сходит; за интерактивной → ждём подачу её контролёра). Позиционно + по контролёру.
@@ -195,10 +195,10 @@ advance(game):
 - `OPPONENT_THINKING` (подача/undo во время серверного расчёта) → **409** (конфликт состояния).
 - Прочие `MoveRejected` (`NOT_YOUR_TURN`/занятость/геометрия/фол/дебют/`GAME_FINISHED`) и `UndoRejected.NOTHING_TO_UNDO` → **422** с машинной причиной (enum-строка).
 - Партия не найдена / нет доступа → **404** (скрываем существование).
-- Неизвестный `levelId` → **422**.
+- Неизвестный `levelId` → **400** (`BadInputError`, единая модель ошибок среза 1).
 - Сбой движка: в синхронном пути его нет (расчёт фоновый) → событие `error` в SSE, не HTTP-кодом.
 
-> **Маппинг `MoveRejected`/`UndoRejected` → HTTP — делает game-роутер** (или новый exception-handler): ветвит код по `.reason` (`OPPONENT_THINKING`→409, прочие→422). В `error_handlers._MAP` среза 1 этих доменных типов НЕТ (там только `AuthError`/`NotFoundError`/`ConflictError`/`ForbiddenError`/`RateLimitError`/`BadInputError`). А вот «нет доступа/не найдена»→404 и «неизвестный `levelId`»→422 удобнее бросать как `NotFoundError`/`BadInputError` — их `_MAP` уже покрывает.
+> **Маппинг `MoveRejected`/`UndoRejected` → HTTP — делает game-роутер** (или новый exception-handler): ветвит код по `.reason` (`OPPONENT_THINKING`→409, прочие→422). В `error_handlers._MAP` среза 1 этих доменных типов НЕТ (там только `AuthError`/`NotFoundError`/`ConflictError`/`ForbiddenError`/`RateLimitError`/`BadInputError`). А вот «нет доступа/не найдена»→404 и «неизвестный `levelId`»→400 удобнее бросать как `NotFoundError`/`BadInputError` — их `_MAP` уже покрывает.
 
 ## Конфигурация
 

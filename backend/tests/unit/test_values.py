@@ -27,10 +27,19 @@ def test_color_to_move_by_move_count():
 
 def test_game_status_values_match_spec_enum():
     # значения попадут в БД и API (этапы 2–3) — фиксируем строки спека §4.3
-    assert GameStatus.AWAITING_HUMAN.value == "awaiting_human"
-    assert GameStatus.ENGINE_THINKING.value == "engine_thinking"
+    assert GameStatus.AWAITING_MOVE.value == "awaiting_move"
+    assert GameStatus.OPPONENT_THINKING.value == "opponent_thinking"
     assert GameStatus.FINISHED_BLACK.value == "finished_black"
     assert GameStatus.FINISHED_WHITE.value == "finished_white"
     assert GameStatus.FINISHED_DRAW.value == "finished_draw"
     assert GameStatus.FINISHED_BLACK.is_finished
-    assert not GameStatus.AWAITING_HUMAN.is_finished
+    assert not GameStatus.AWAITING_MOVE.is_finished
+
+
+def test_status_neutral_names():
+    from app.domain.values import GameStatus, MoveRejectReason, UndoRejectReason
+
+    assert GameStatus.AWAITING_MOVE.value == "awaiting_move"
+    assert GameStatus.OPPONENT_THINKING.value == "opponent_thinking"
+    assert MoveRejectReason.OPPONENT_THINKING.value == "opponent_thinking"
+    assert UndoRejectReason.OPPONENT_THINKING.value == "opponent_thinking"

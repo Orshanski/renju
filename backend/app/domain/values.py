@@ -16,8 +16,8 @@ class Color(StrEnum):
 
 
 class GameStatus(StrEnum):
-    AWAITING_HUMAN = "awaiting_human"
-    ENGINE_THINKING = "engine_thinking"
+    AWAITING_MOVE = "awaiting_move"
+    OPPONENT_THINKING = "opponent_thinking"
     FINISHED_BLACK = "finished_black"
     FINISHED_WHITE = "finished_white"
     FINISHED_DRAW = "finished_draw"
@@ -50,6 +50,7 @@ class MoveRejectReason(StrEnum):
     FORBIDDEN = "forbidden"
     OPENING_VIOLATION = "opening_violation"
     GAME_FINISHED = "game_finished"
+    OPPONENT_THINKING = "opponent_thinking"
 
 
 class MoveRejected(DomainError):
@@ -60,7 +61,7 @@ class MoveRejected(DomainError):
 
 class UndoRejectReason(StrEnum):
     DISABLED = "disabled"
-    ENGINE_THINKING = "engine_thinking"
+    OPPONENT_THINKING = "opponent_thinking"
     GAME_FINISHED = "game_finished"
     LIMIT_REACHED = "limit_reached"
     NOTHING_TO_UNDO = "nothing_to_undo"
