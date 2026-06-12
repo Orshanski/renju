@@ -33,6 +33,10 @@ frontend/dist/
 # Secrets / local env
 .env
 .env.*
+/data/
+
+# Playwright MCP session artifacts
+.playwright-mcp/
 !.env.example
 
 # Beads / Dolt files (added by bd init)

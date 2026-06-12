@@ -1,0 +1,18 @@
+/* по prototype/index.html (eyebrow/title/sub); токены — @value (tokens.module.css) */
+@value sumiSoft, vermillion, fontSerif from "../styles/tokens.module.css";
+
+.wrap { max-width: 1120px; margin: 0 auto; }
+.eyebrow {
+  font-family: fontSerif;
+  font-weight: 600;
+  letter-spacing: 5px;
+  text-transform: uppercase;
+  font-size: 11px;
+  color: vermillion;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.eyebrow::before { content: ""; width: 26px; height: 1px; background: vermillion; display: inline-block; }
+.title { font-family: fontSerif; font-weight: 800; font-size: 40px; line-height: 1.05; margin: 14px 0 6px; letter-spacing: -0.5px; }
+.sub { color: sumiSoft; font-size: 15px; font-weight: 300; }

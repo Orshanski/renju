@@ -1,0 +1,57 @@
+/* Каркас приложения — по prototype/index.html §App chrome; токены — @value (tokens.module.css) */
+@value washi, sumi, sumiSoft, sumiFaint, vermillion, fontSerif, fontSans, bpCompact from "../styles/tokens.module.css";
+
+.shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  font-family: fontSans;
+  color: sumi;
+  position: relative;
+  background:
+    radial-gradient(1200px 700px at 80% -10%, #f6efdf 0%, rgba(246, 239, 223, 0) 60%),
+    radial-gradient(900px 600px at -10% 110%, #e8dcc2 0%, rgba(232, 220, 194, 0) 55%),
+    washi;
+}
+/* зерно васи-бумаги (в прототипе — body::before; здесь экран владеет своим хромом) */
+.shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.5;
+  background-image: url("../styles/grain.svg");
+  mix-blend-mode: multiply;
+}
+.bar {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  padding: 18px 34px;
+  border-bottom: 1px solid rgba(60, 45, 25, 0.16);
+  background: linear-gradient(#f4ecdb, #efe5cf);
+}
+.brand { display: flex; align-items: baseline; gap: 12px; cursor: pointer; }
+.kanji { font-family: fontSerif; font-weight: 800; font-size: 30px; letter-spacing: 2px; color: sumi; }
+.lat { font-family: fontSerif; font-weight: 600; letter-spacing: 7px; font-size: 13px; text-transform: uppercase; color: sumiSoft; transform: translateY(-3px); }
+.spacer { flex: 1; }
+.userchip { display: flex; align-items: center; gap: 10px; color: sumiSoft; font-size: 14px; }
+.av {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 30%, #4d4842, #1c1813);
+  color: #f0e9d8;
+  display: grid;
+  place-items: center;
+  font-family: fontSerif;
+  font-size: 13px;
+}
+/* font-family: inherit — поправка дефекта прототипа: кнопка не наследует шрифт (UA-дефолт), «выйти» съезжало */
+.linkbtn { background: none; border: none; font-family: inherit; color: sumiFaint; cursor: pointer; font-size: 13px; letter-spacing: 0.4px; }
+.linkbtn:hover { color: vermillion; }
+.main { position: relative; z-index: 2; flex: 1; padding: 38px 34px 60px; }
+@media bpCompact { .bar { padding: 12px 16px; } .main { padding: 20px 16px 40px; } }
