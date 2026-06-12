@@ -1,0 +1,11 @@
+/* токены — theme.module.css (Task 1 Step 6b) */
+.wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.card { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: var(--gap);
+  padding: var(--pad); border: 1px solid var(--color-border); border-radius: var(--radius-lg); }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.input { padding: 10px 12px; font-size: 16px; border: 1px solid var(--color-border-input); border-radius: var(--radius); }
+.button { padding: 10px 12px; font-size: 16px; border: 0; border-radius: var(--radius); cursor: pointer;
+  background: var(--color-primary); color: var(--color-on-primary); }
+.button:disabled { opacity: 0.6; cursor: default; }
+.error { color: var(--color-error); font-size: 14px; }
+@media (max-width: 900px) { .card { max-width: 100%; } } /* компакт ≤900 (брейкпоинт-литерал, см. theme.module.css) */
