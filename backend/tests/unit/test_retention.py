@@ -11,7 +11,9 @@ def test_section_priority_favorite_over_finished():
 
 
 def _e(i, t, c=None):
-    return Evictable(id=i, sort_key=datetime(2026, 1, t), created_at=datetime(2026, 1, c or t))
+    return Evictable(
+        id=i, sort_key=datetime(2026, 1, t), created_at=datetime(2026, 1, c if c is not None else t)
+    )
 
 
 def test_select_evictions_keeps_newest_n():
@@ -20,6 +22,7 @@ def test_select_evictions_keeps_newest_n():
     assert select_evictions(items, limit=3) == []  # ровно лимит — никого
     assert select_evictions(items, limit=5) == []  # меньше лимита
     assert select_evictions(items, limit=1) == ["a", "b"]  # держим 1 → выбывают два старейших
+    assert select_evictions([], limit=1) == []  # пустой раздел — нечего вытеснять
 
 
 def test_select_evictions_tiebreak_created_then_id():
