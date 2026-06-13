@@ -1,8 +1,10 @@
 import uuid
 from collections.abc import Sequence
+from datetime import UTC, datetime
 
 from ..domain.game import undo_truncate
 from ..domain.opening import CENTER
+from ..domain.retention import Evictable, Section, game_section, select_evictions
 from ..domain.rules import outcome_after, winning_line
 from ..domain.undo import UndoPolicy, check_undo
 from ..domain.values import (
@@ -14,12 +16,13 @@ from ..domain.values import (
     color_of_move,
     color_to_move,
 )
-from ..exceptions import NotFoundError
+from ..exceptions import ConflictError, NotFoundError
 from ..game_service import apply_move
 from ..models.game import Game
 from ..rapfi.adapter import EngineError
 from .controllers import Engine, User, controller_from_json, controller_to_json
 from .players import Player, make_player
+from .settings_repository import SettingsRepository
 
 
 def _final_status_payload(game: Game) -> dict:
@@ -31,12 +34,19 @@ def _final_status_payload(game: Game) -> dict:
     return payload
 
 
+def _now() -> datetime:
+    """Текущий момент UTC naive — соответствует конвенции datetime-колонок модели Game
+    (server_default=func.current_timestamp() без timezone=True → naive UTC в SQLite)."""
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
 class GameService:
-    def __init__(self, repo, hub, adapter, levels: dict):
+    def __init__(self, repo, hub, adapter, levels: dict, settings_repo: SettingsRepository):
         self._repo = repo
         self._hub = hub
         self._adapter = adapter
         self._levels = levels  # level_id → EngineParams
+        self._settings_repo = settings_repo
 
     async def fouls(self, game: Game, moves: Sequence[Point]) -> list[Point]:
         """Мемо-фолы: forbidden_log[str(len)] есть → вернуть; иначе движок + запись.
@@ -75,6 +85,56 @@ class GameService:
             else GameStatus.AWAITING_MOVE.value
         )
 
+    def _set_finished_at(self, game: Game) -> None:
+        """Ставит finished_at при переходе в is_finished. Идемпотентно: не перезатирает
+        уже выставленный момент (undo сбрасывает его в None, доигра проставит заново)."""
+        if GameStatus(game.status).is_finished and game.finished_at is None:
+            game.finished_at = _now()
+
+    async def _evict_current(self, owner_id: int) -> None:
+        """Подрезает раздел CURRENT для владельца до current_limit."""
+        settings = await self._settings_repo.get_or_default(owner_id)
+        if not settings.current_limit_enabled:
+            return
+        games = await self._repo.list_by_owner(owner_id)
+        candidates: list[Evictable] = []
+        for g in games:
+            if game_section(g.status, bool(g.favorite)) is not Section.CURRENT:
+                continue
+            # updated_at — sort_key для текущих; created_at — тай-брейк
+            # В InMemory-репо updated_at может быть None (БД не заполняет автоматически).
+            # Fallback: created_at (консервативно — не падаем на None в сортировке).
+            sort_key: datetime = (
+                g.updated_at if g.updated_at is not None else (g.created_at or _now())
+            )
+            created_at: datetime = g.created_at if g.created_at is not None else _now()
+            candidates.append(Evictable(id=g.id, sort_key=sort_key, created_at=created_at))
+        for game_id in select_evictions(candidates, settings.current_limit):
+            await self._repo.delete(game_id)
+
+    async def _evict_finished(self, owner_id: int) -> None:
+        """Подрезает раздел FINISHED для владельца до finished_limit."""
+        settings = await self._settings_repo.get_or_default(owner_id)
+        if not settings.finished_limit_enabled:
+            return
+        games = await self._repo.list_by_owner(owner_id)
+        candidates: list[Evictable] = []
+        for g in games:
+            if game_section(g.status, bool(g.favorite)) is not Section.FINISHED:
+                continue
+            # finished_at — sort_key для завершённых; fallback: created_at (легаси/edge, не падаем).
+            sort_key = g.finished_at if g.finished_at is not None else (g.created_at or _now())
+            created_at: datetime = g.created_at if g.created_at is not None else _now()
+            candidates.append(Evictable(id=g.id, sort_key=sort_key, created_at=created_at))
+        for game_id in select_evictions(candidates, settings.finished_limit):
+            await self._repo.delete(game_id)
+
+    async def enforce_limits(self, owner_id: int) -> None:
+        """Подрезает оба раздела (CURRENT + FINISHED) до лимитов.
+        Вызывается из settings-update эндпоинта."""
+        await self._evict_current(owner_id)
+        await self._evict_finished(owner_id)
+
     async def create_game(self, owner_id: int, opponent_level: str, human_color: str) -> Game:
         human = Color(human_color)
         engine_side = Color.WHITE if human is Color.BLACK else Color.BLACK
@@ -90,9 +150,12 @@ class GameService:
             status=GameStatus.AWAITING_MOVE.value,
             undo_count=0,
             forbidden_log={},
+            favorite=False,
+            finished_at=None,
         )
         game.status = self._next_status(game, [CENTER])  # opponent_thinking, если ход 2 за движком
         await self._repo.create(game)
+        await self._evict_current(owner_id)
         return game  # advance НЕ здесь — фоновый прогон планирует роутер (Task 10)
 
     async def advance(self, game: Game) -> None:
@@ -104,8 +167,10 @@ class GameService:
             outcome = outcome_after(moves)
             if outcome is not None:
                 game.status = outcome.value
+                self._set_finished_at(game)
                 self._hub.publish(game.id, "status", _final_status_payload(game))
                 await self._repo.update(game)
+                await self._evict_finished(game.owner_id)
                 return
             side = color_to_move(len(moves))
             if not self._is_engine(game, side):  # интерактивная — ждём подачу
@@ -180,8 +245,12 @@ class GameService:
         )
         game.status = self._next_status(game, [tuple(m) for m in game.moves])
         if GameStatus(game.status).is_finished:  # ход человека завершил партию — фона не будет
+            self._set_finished_at(game)
             self._hub.publish(game.id, "status", _final_status_payload(game))
-        await self._repo.update(game)
+            await self._repo.update(game)
+            await self._evict_finished(game.owner_id)
+        else:
+            await self._repo.update(game)
         return game  # advance НЕ здесь: при opponent_thinking роутер запланирует фоновый прогон
 
     async def get_game(self, game_id: str, user_id: int) -> Game:
@@ -213,6 +282,7 @@ class GameService:
         game.forbidden_log = {key: v for key, v in game.forbidden_log.items() if int(key) <= k}
         game.undo_count += 1
         game.status = GameStatus.AWAITING_MOVE.value
+        game.finished_at = None
         self._hub.publish(game.id, "undo", {"move_count": k})
         # из лога напрямую — undo структурно без движка (не через fouls, который
         # на отсутствующем ключе чёрной позиции дёрнул бы forbidden_points)
@@ -221,3 +291,25 @@ class GameService:
             self._hub.publish(game.id, "forbidden", {"points": [list(p) for p in fb]})
         await self._repo.update(game)
         return game
+
+    async def favorite_game(self, game_id: str, user_id: int) -> Game:
+        """Помечает завершённую партию как избранную. На незавершённой → ConflictError."""
+        game = await self._load_owned(game_id, user_id)
+        if game_section(game.status, bool(game.favorite)) is not Section.FINISHED:
+            raise ConflictError("Only finished (non-favorite) games can be marked as favorite")
+        game.favorite = True
+        await self._repo.update(game)
+        return game
+
+    async def unfavorite_game(self, game_id: str, user_id: int) -> Game:
+        """Снимает отметку избранного. finished_at НЕ трогаем; проверяет лимит."""
+        game = await self._load_owned(game_id, user_id)
+        game.favorite = False
+        await self._repo.update(game)
+        await self._evict_finished(game.owner_id)
+        return game
+
+    async def delete_game(self, game_id: str, user_id: int) -> None:
+        """Удаляет партию. Чужому/несуществующей → NotFoundError."""
+        await self._load_owned(game_id, user_id)
+        await self._repo.delete(game_id)

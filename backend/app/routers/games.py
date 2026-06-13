@@ -17,6 +17,7 @@ from ..exceptions import BadInputError
 from ..game.dtos import CreateGameBody, LevelDTO
 from ..game.repository import SqlGameRepository
 from ..game.service import GameService
+from ..game.settings_repository import SqlSettingsRepository
 from ..levels_config import resolve_level
 from ..logging_utils import safe
 from .auth import current_user
@@ -32,6 +33,7 @@ def _build_service(app: FastAPI, session: AsyncSession) -> GameService:
         hub=app.state.event_hub,
         adapter=app.state.adapter,
         levels=levels,
+        settings_repo=SqlSettingsRepository(session),
     )
 
 
