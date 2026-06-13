@@ -29,6 +29,8 @@ export function GameCard({ game, onOpen, onChanged }: Props) {
   async function run(action: () => Promise<unknown>) {
     if (busy) return;
     setBusy(true);
+    // busy намеренно НЕ сбрасывается на успехе: после onChanged() родитель перезапросит
+    // раздел и размонтирует эту карточку — застрявший busy недостижим.
     try { await action(); setMenu(false); onChanged(); }
     catch { setBusy(false); } // меню остаётся — можно повторить
   }
@@ -40,6 +42,12 @@ export function GameCard({ game, onOpen, onChanged }: Props) {
       role="button"
       tabIndex={0}
       onClick={() => onOpen(game.id)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen(game.id);
+        }
+      }}
       onContextMenu={openMenu}
       onPointerDown={onPointerDown}
       onPointerUp={cancelLongTap}
@@ -54,15 +62,25 @@ export function GameCard({ game, onOpen, onChanged }: Props) {
       <div className={styles.date}>{sectionDateLabel(game.section, game)}</div>
 
       {menu && (
-        <div className={styles.menu} role="menu" onClick={(e) => e.stopPropagation()}>
-          {game.section === "finished" && (
-            <button role="menuitem" disabled={busy} onClick={() => run(() => favoriteGame(game.id))}>В избранное</button>
-          )}
-          {game.section === "favorite" && (
-            <button role="menuitem" disabled={busy} onClick={() => run(() => unfavoriteGame(game.id))}>Из избранного</button>
-          )}
-          <button role="menuitem" disabled={busy} onClick={() => run(() => deleteGame(game.id))}>Удалить</button>
-        </div>
+        <>
+          {/* backdrop перехватывает клик вне меню → dismiss; stopPropagation, чтобы
+              pointerdown/click не всплыли к карточке и не открыли партию */}
+          <div
+            data-testid="menu-backdrop"
+            className={styles.backdrop}
+            onPointerDown={(e) => { e.stopPropagation(); setMenu(false); }}
+            onClick={(e) => e.stopPropagation()}
+          />
+          <div className={styles.menu} role="menu" onClick={(e) => e.stopPropagation()}>
+            {game.section === "finished" && (
+              <button role="menuitem" disabled={busy} onClick={() => run(() => favoriteGame(game.id))}>В избранное</button>
+            )}
+            {game.section === "favorite" && (
+              <button role="menuitem" disabled={busy} onClick={() => run(() => unfavoriteGame(game.id))}>Из избранного</button>
+            )}
+            <button role="menuitem" disabled={busy} onClick={() => run(() => deleteGame(game.id))}>Удалить</button>
+          </div>
+        </>
       )}
     </div>
   );

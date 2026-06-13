@@ -43,6 +43,21 @@ it("клик по карточке (не по меню) зовёт onOpen", asyn
   expect(onOpen).toHaveBeenCalledWith("g1");
 });
 
+it("Enter на карточке открывает партию (a11y)", async () => {
+  const onOpen = vi.fn();
+  render(<GameCard game={finished} onOpen={onOpen} onChanged={() => {}} />);
+  fireEvent.keyDown(screen.getByTestId("card-g1"), { key: "Enter" });
+  expect(onOpen).toHaveBeenCalledWith("g1");
+});
+
+it("клик по фону вне меню закрывает меню", async () => {
+  render(<GameCard game={finished} onOpen={() => {}} onChanged={() => {}} />);
+  fireEvent.contextMenu(screen.getByTestId("card-g1"));
+  expect(await screen.findByRole("menu")).toBeInTheDocument();
+  fireEvent.pointerDown(screen.getByTestId("menu-backdrop"));
+  expect(screen.queryByRole("menu")).toBeNull();
+});
+
 it("long-tap ТОЛЬКО на тач: touch-pointerdown открывает меню, мышь — нет (спека §6)", () => {
   const pointerDown = (el: Element, pointerType: string) => {
     const ev = createEvent.pointerDown(el);

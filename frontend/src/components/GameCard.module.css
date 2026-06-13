@@ -1,5 +1,5 @@
 /* Карточка партии с контекстным меню; токены — @value */
-@value sumiSoft, vermillion, vermillionDeep, shadowSm, fontSerif, fontSans, washi, sumi, sumiFaint from "../styles/tokens.module.css";
+@value sumiSoft, shadowSm, fontSerif, fontSans, washi, paper, sumi, sumiFaint from "../styles/tokens.module.css";
 
 .card {
   position: relative; /* якорь для .menu */
@@ -35,11 +35,13 @@
   color: sumiFaint;
 }
 
+.backdrop { position: fixed; inset: 0; z-index: 90; } /* перехват клика вне меню → dismiss */
+
 .menu {
   position: absolute; /* всплывает относительно .card (position:relative) */
   top: calc(100% + 4px);
   left: 0;
-  background: #fff;
+  background: paper; /* светлая тёплая поверхность — отделяется от washi-карточки под ней */
   border-radius: 8px;
   box-shadow: shadowSm;
   overflow: hidden;
