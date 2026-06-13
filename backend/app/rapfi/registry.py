@@ -16,7 +16,6 @@ from typing import Protocol
 from ..domain.engine_params import EngineParams
 from ..domain.values import Point
 from .adapter import (
-    _FORBID_PARAMS,
     _FORBID_TIMEOUT_S,
     _WALL_CLOCK_SLACK_S,
     EngineError,
@@ -29,7 +28,6 @@ from .protocol import (
     ParsedLine,
     ProtocolError,
     forbid_commands,
-    init_commands,
     parse_line,
     plan_sync,
 )
@@ -133,10 +131,10 @@ class EngineRegistry:
     ) -> list[Point]:
         if len(moves) % 2 != 0:
             return []
-        commands = init_commands(_FORBID_PARAMS) + forbid_commands(moves)
+        target: list[Point] = [(m[0], m[1]) for m in moves]
         slot = await self._claim(game_id, level_tag, "inflight")
         try:
-            parsed = await self._run(slot, game_id, commands, LineKind.FORBID, _FORBID_TIMEOUT_S)
+            parsed = await self._run_forbid(slot, game_id, target, _FORBID_TIMEOUT_S)
         finally:
             await self._unclaim(slot, "inflight")
         if parsed.forbidden is None:
@@ -145,7 +143,7 @@ class EngineRegistry:
             "forbidden_points game=%s pid=%s moves=%d n=%d",
             game_id,
             slot.pid,
-            len(moves),
+            len(target),
             len(parsed.forbidden),
         )
         return list(parsed.forbidden)
@@ -268,32 +266,39 @@ class EngineRegistry:
             slot.last_activity = self._now()
             self._cond.notify_all()
 
-    # --- расчёт на слоте (retry-once + respawn per-slot) ---
+    # --- forbidden-путь (инкрементальный: warm=YXSHOWFORBID, cold=YXBOARD без think) ---
 
-    async def _run(
-        self, slot: EngineSlot, game_id: str, commands: list[str], want: LineKind, timeout_s: float
+    async def _run_forbid(
+        self, slot: EngineSlot, game_id: str, target: list[Point], timeout_s: float
     ) -> ParsedLine:
+        """retry-once обвязка для инкрементального запроса фолов."""
         async with slot.io_lock:
             try:
-                return await self._attempt(slot, game_id, commands, want, timeout_s)
+                return await self._attempt_forbid(slot, game_id, target, timeout_s)
             except (TimeoutError, EngineProcessDied, ProtocolError):
                 await self._respawn(slot, game_id, reason="hang")
             try:
-                return await self._attempt(slot, game_id, commands, want, timeout_s)
+                return await self._attempt_forbid(slot, game_id, target, timeout_s)
             except (TimeoutError, EngineProcessDied, ProtocolError) as e:
                 await self._respawn(slot, game_id, reason="hang")
                 raise EngineError(f"engine failed twice: {e!r}") from e
 
-    async def _attempt(
-        self, slot: EngineSlot, game_id: str, commands: list[str], want: LineKind, timeout_s: float
+    async def _attempt_forbid(
+        self, slot: EngineSlot, game_id: str, target: list[Point], timeout_s: float
     ) -> ParsedLine:
+        """Один attempt: warm → YXSHOWFORBID; cold → YXBOARD+YXSHOWFORBID, затем synced=target."""
         if slot.proc is None or not slot.proc.alive:
             await self._respawn(slot, game_id, reason="dead")
+        warm = slot.synced == target
+        cmds = ["YXSHOWFORBID"] if warm else forbid_commands(target)
         proc = slot.proc
         assert proc is not None  # _respawn выставил slot.proc
         async with asyncio.timeout(timeout_s):
-            await proc.send(commands)
-            return await self._read_until(proc, want)
+            await proc.send(cmds)
+            parsed = await self._read_until(proc, LineKind.FORBID)
+        if not warm:
+            slot.synced = target  # YXBOARD заменил доску на target (своего хода движок не делал)
+        return parsed
 
     async def _read_until(self, proc: _EngineProc, want: LineKind) -> ParsedLine:
         """Дренаж строк до нужного типа. Вызывать под asyncio.timeout."""

@@ -302,6 +302,46 @@ async def test_post_lock_invalid_move_resets_synced():
     await reg.close()
 
 
+# --- Task 4 (rj-t95): инкрементальный forbidden_points ---
+
+
+@pytest.mark.asyncio
+async def test_forbid_warm_only_yxshowforbid():
+    procs = []
+
+    async def spawn(**kw):
+        p = FakeProc(["8,8", "FORBID ."])
+        procs.append(p)
+        return p
+
+    reg = make_registry(spawn)
+    await reg.compute_move("g", [(7, 7)], P)  # synced=[(7,7),(8,8)] — чёрный к ходу
+    procs[0].sent.clear()
+    await reg.forbidden_points("g", [(7, 7), (8, 8)])  # == synced → тёплый
+    sent = [c for batch in procs[0].sent for c in batch]
+    assert sent == ["YXSHOWFORBID"]  # ни START, ни YXBOARD, ни INFO
+    assert reg._slots["g"].synced == [(7, 7), (8, 8)]  # не тронут (read-only)
+    await reg.close()
+
+
+@pytest.mark.asyncio
+async def test_forbid_cold_when_synced_none():
+    procs = []
+
+    async def spawn(**kw):
+        p = FakeProc(["FORBID ."])
+        procs.append(p)
+        return p
+
+    reg = make_registry(spawn)
+    await reg.forbidden_points("g", [(7, 7), (8, 8)])  # synced=None → cold YXBOARD без think
+    sent = [c for batch in procs[0].sent for c in batch]
+    assert "YXBOARD" in sent and "YXSHOWFORBID" in sent
+    assert "START 15" not in sent and not any(s.startswith("INFO strength") for s in sent)
+    assert reg._slots["g"].synced == [(7, 7), (8, 8)]  # cold-форбид без INFO
+    await reg.close()
+
+
 # --- Task 6: лог-контракт ---
 
 
