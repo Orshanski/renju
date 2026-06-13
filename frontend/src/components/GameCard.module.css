@@ -13,7 +13,7 @@
   transition: 0.15s;
   user-select: none;
 }
-.card:hover { transform: translateY(-1px); box-shadow: 0 8px 24px -10px rgba(40, 28, 14, 0.55); }
+.card:hover { box-shadow: 0 8px 24px -10px rgba(40, 28, 14, 0.55); }
 
 .status {
   font-family: fontSerif;
