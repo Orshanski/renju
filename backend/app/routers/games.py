@@ -212,6 +212,44 @@ async def undo(
     return _state(game, user.user_id, request.app.state.event_hub)
 
 
+def _engine_level_tag(controllers: dict) -> str:
+    """level_id engine-оппонента (для логов реестра); '-' если engine-стороны нет."""
+    for c in controllers.values():
+        if c.get("kind") == "engine":
+            return c["level_id"]
+    return "-"
+
+
+@router.post("/games/{game_id}/enter")
+async def enter(
+    game_id: str,
+    request: Request,
+    user: Annotated[CurrentUser, Depends(current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+):
+    # presence++ (поднимает/переиспользует процесс партии). Вход с экрана /game/:id.
+    game = await _service(request, session).get_game(game_id, user.user_id)  # 404 если нет доступа
+    adapter = request.app.state.adapter
+    if adapter is not None:
+        await adapter.mark_present(game_id, _engine_level_tag(game.controllers))
+    return {"ok": True}
+
+
+@router.post("/games/{game_id}/leave")
+async def leave(
+    game_id: str,
+    request: Request,
+    user: Annotated[CurrentUser, Depends(current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+):
+    # presence-- (гасит процесс, если ушло последнее устройство и нет идущего расчёта).
+    await _service(request, session).get_game(game_id, user.user_id)  # 404 если нет доступа
+    adapter = request.app.state.adapter
+    if adapter is not None:
+        await adapter.mark_absent(game_id)
+    return {"ok": True}
+
+
 @router.get("/games/{game_id}/events")
 async def events(game_id: str, request: Request, since: int = 0):
     # SSE — долгоживущий стрим: НЕ берём Depends(current_user)/Depends(get_session)

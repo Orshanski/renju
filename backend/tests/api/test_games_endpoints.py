@@ -75,6 +75,26 @@ async def test_move_when_opponent_thinking_409(app, client, games_api):
     assert r.status_code == 409  # MoveRejected(OPPONENT_THINKING) → 409
 
 
+async def test_enter_leave_call_registry(app, client, games_api):
+    calls = []
+
+    class PresenceAdapter(games_api.FakeAdapter):
+        async def mark_present(self, game_id, level_tag="-"):
+            calls.append(("enter", game_id))
+
+        async def mark_absent(self, game_id, *, reason="leave"):
+            calls.append(("leave", game_id))
+
+    app.state.adapter = PresenceAdapter()
+    await games_api.seed_login(app, client)
+    gid = (
+        await client.post("/api/games", json={"opponent": {"kind": "engine", "levelId": "master"}})
+    ).json()["id"]
+    assert (await client.post(f"/api/games/{gid}/enter")).status_code == 200
+    assert (await client.post(f"/api/games/{gid}/leave")).status_code == 200
+    assert ("enter", gid) in calls and ("leave", gid) in calls
+
+
 async def test_move_rejection_is_logged(app, client, games_api, caplog):
     import logging
 
