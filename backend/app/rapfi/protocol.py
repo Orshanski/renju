@@ -68,14 +68,58 @@ def _on_board(point: Point) -> bool:
     return 0 <= point[0] < BOARD_SIZE and 0 <= point[1] < BOARD_SIZE
 
 
+@dataclass(frozen=True)
+class SyncPlan:
+    """Как привести движок от synced к target ДЛЯ ЗАПРОСА ХОДА (compute_move).
+
+    cold=True → послать START+INFO+BOARD(target), сбросив состояние; иначе —
+    takebacks (координаты снимаемых камней, в порядке отправки) + один TURN."""
+
+    cold: bool
+    takebacks: tuple[Point, ...]
+    turn: Point | None
+
+
+def plan_sync(synced: Sequence[Point] | None, target: Sequence[Point]) -> SyncPlan:
+    """Планировщик инкрементальной синхронизации позиции.
+
+    Если synced is None — движок не инициализирован, нужен холодный старт.
+    Иначе: находим общий префикс; если после него в target ровно один ход —
+    горячий путь (TAKEBACK* + TURN); в остальных аномальных случаях — cold."""
+    if synced is None:
+        return SyncPlan(cold=True, takebacks=(), turn=None)
+    n = 0
+    while n < len(synced) and n < len(target) and synced[n] == target[n]:
+        n += 1
+    tail = target[n:]
+    if len(tail) != 1:  # 0 (target⊆synced) или >1 (разрыв) — оба в cold
+        return SyncPlan(cold=True, takebacks=(), turn=None)
+    takebacks = tuple(reversed(synced[n:]))
+    return SyncPlan(cold=False, takebacks=takebacks, turn=tail[0])
+
+
+def tunable_commands(params: EngineParams) -> list[str]:
+    """Per-move INFO (сила/время). Шлём перед каждым расчётом."""
+    return [f"INFO strength {params.strength}", f"INFO timeout_turn {params.timeout_turn_ms}"]
+
+
+def turn_commands(point: Point) -> list[str]:
+    """TURN x,y — запрос хода от движка при инкрементальном режиме."""
+    _validate_moves([point])
+    x, y = point
+    return [f"TURN {x},{y}"]
+
+
+def takeback_commands(points: Sequence[Point]) -> list[str]:
+    """TAKEBACK x,y на каждый снимаемый камень (gomocup.cpp:586 читает x,y и
+    откатывает последний ход). Анти-инъекция: только int 0..14."""
+    _validate_moves(points)
+    return [f"TAKEBACK {x},{y}" for x, y in points]
+
+
 def init_commands(params: EngineParams) -> list[str]:
-    """Переинициализация перед каждым расчётом — состояние партий не протекает."""
-    return [
-        f"START {BOARD_SIZE}",
-        "INFO rule 4",
-        f"INFO strength {params.strength}",
-        f"INFO timeout_turn {params.timeout_turn_ms}",
-    ]
+    """Холодная инициализация: START + правило + tunable."""
+    return [f"START {BOARD_SIZE}", "INFO rule 4", *tunable_commands(params)]
 
 
 def position_commands(moves: Sequence[Point]) -> list[str]:
