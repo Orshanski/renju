@@ -205,3 +205,17 @@ it("размонтирование закрывает стрим", async () => {
   unmount();
   expect(FakeEventSource.last().readyState).toBe(2);
 });
+
+it("presence: enter на mount, leave на unmount (rj-899)", async () => {
+  const calls: string[] = [];
+  server.use(
+    http.get("/api/games/g1", () => HttpResponse.json(state())),
+    http.post("/api/games/g1/enter", () => { calls.push("enter"); return HttpResponse.json({ ok: true }); }),
+    http.post("/api/games/g1/leave", () => { calls.push("leave"); return HttpResponse.json({ ok: true }); }),
+  );
+  const { result, unmount } = renderHook(() => useGame("g1", 0));
+  await waitFor(() => expect(result.current.view).not.toBeNull());
+  await waitFor(() => expect(calls).toContain("enter"));
+  unmount();
+  await waitFor(() => expect(calls).toContain("leave"));
+});

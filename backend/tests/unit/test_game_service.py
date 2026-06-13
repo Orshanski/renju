@@ -53,24 +53,24 @@ def test_apply_move_on_finished_game_rejected():
 class _FakeAdapter:
     def __init__(self):
         self.received_zone = "unset"
+        self.received_game_id = None
 
-    async def compute_move(self, moves, params, allowed_zone=None):
+    async def compute_move(self, game_id, moves, params, allowed_zone=None, *, level_tag="-"):
         self.received_zone = allowed_zone
+        self.received_game_id = game_id
         return (8, 8)
 
 
 async def test_engine_move_passes_opening_zone_as_allowed_zone():
     fake = _FakeAdapter()
-    moves = [(7, 7)]  # ход 2 → зона 3×3
     params = EngineParams(strength=50, timeout_turn_ms=1000)
-    move = await engine_move(fake, moves, params)  # type: ignore[arg-type]  # _FakeAdapter — дубль
+    move = await engine_move(fake, [(7, 7)], params, "g1")  # type: ignore[arg-type]
     assert move == (8, 8)
-    assert fake.received_zone == opening_zone(1)
+    assert fake.received_zone == opening_zone(1) and fake.received_game_id == "g1"
 
 
 async def test_engine_move_unrestricted_after_opening():
     fake = _FakeAdapter()
-    moves = [(7, 7), (8, 8), (9, 9), (6, 6)]  # len=4 → зона None
     params = EngineParams(strength=50, timeout_turn_ms=1000)
-    await engine_move(fake, moves, params)  # type: ignore[arg-type]
+    await engine_move(fake, [(7, 7), (8, 8), (9, 9), (6, 6)], params, "g2")  # type: ignore[arg-type]
     assert fake.received_zone is None

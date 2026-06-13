@@ -19,15 +19,18 @@ class InteractivePlayer:
 
 
 class EnginePlayer:
-    def __init__(self, adapter, params):
+    def __init__(self, adapter, params, game_id: str, level_tag: str = "-"):
         self._adapter = adapter
         self._params = params
+        self._game_id = game_id
+        self._level_tag = level_tag
 
     async def take_turn(self, moves: Sequence[Point]) -> Point | None:
-        return await engine_move(self._adapter, moves, self._params)
+        return await engine_move(self._adapter, moves, self._params, self._game_id, self._level_tag)
 
 
-def make_player(ctl: Controller, adapter, levels: dict) -> Player:
+def make_player(ctl: Controller, adapter, levels: dict, game_id: str) -> Player:
     if isinstance(ctl, User):
-        return InteractivePlayer(ctl.user_id)
-    return EnginePlayer(adapter, levels[ctl.level_id])  # levels: level_id → EngineParams
+        return InteractivePlayer(ctl.user_id)  # game_id игнорируется (ход придёт подачей)
+    # levels: level_id → EngineParams; level_tag = level_id оппонента (для логов)
+    return EnginePlayer(adapter, levels[ctl.level_id], game_id, level_tag=ctl.level_id)

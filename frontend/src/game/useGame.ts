@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiRequest } from "../api/client";
-import { getGame, postMove, postUndo } from "./api";
+import { enterGame, getGame, leaveGame, postMove, postUndo } from "./api";
 import { canPlay } from "./legality";
 import { applyEvent, fromState, placePending } from "./reducer";
 import type { GameEventMessage, Point } from "./types";
@@ -74,6 +74,7 @@ export function useGame(gameId: string, reconnectDelayMs = 3000) {
 
   useEffect(() => {
     aliveRef.current = true;
+    void enterGame(gameId).catch(() => {}); // presence++: поднять/переиспользовать процесс партии (rj-899)
     void (async () => {
       try {
         const st = await getGame(gameId);
@@ -88,6 +89,7 @@ export function useGame(gameId: string, reconnectDelayMs = 3000) {
       aliveRef.current = false;
       esRef.current?.close();
       if (timerRef.current) clearTimeout(timerRef.current);
+      void leaveGame(gameId).catch(() => {}); // presence--: гасим, если ушло последнее устройство
     };
   }, [gameId, connect, commit]);
 

@@ -32,21 +32,37 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         from .config import REPO_ROOT
         from .game.event_hub import InMemoryEventHub
         from .levels_config import load_levels
-        from .rapfi.adapter import RapfiAdapter
+        from .rapfi.registry import EngineRegistry
 
         engine = make_engine(settings)
         app.state.engine = engine
         app.state.sessionmaker = make_sessionmaker(engine)
         try:  # E1: НЕ сцеплять старт приложения с собранным бинарём (API-тесты подменят фейком)
-            app.state.adapter = RapfiAdapter(  # как scripts/play_cli.py:62 — cwd=REPO_ROOT
+            app.state.adapter = EngineRegistry(  # процесс на партию (rj-899)
                 bin_path=settings.resolved_rapfi_bin(),
                 config_path=settings.rapfi_config,
                 cwd=REPO_ROOT,
+                idle_timeout_s=settings.engine_idle_timeout_s,
                 kill_grace_s=settings.engine_kill_grace_s,
             )
         except FileNotFoundError:
             logging.getLogger("renju").warning("Rapfi bin не собран — adapter=None")
             app.state.adapter = None
+
+        registry = app.state.adapter  # sweep крутит ИМЕННО этот реестр (тесты свопают adapter)
+
+        async def _sweep_loop():  # idle-таймаут: периодически гасим простаивающие процессы
+            assert registry is not None  # таск создаётся только при registry is not None
+            while True:
+                await asyncio.sleep(settings.engine_sweep_interval_s)
+                try:
+                    await registry.sweep_once()
+                except Exception:
+                    logging.getLogger("renju.engine").exception("sweep failed")
+
+        app.state.engine_sweep = (
+            asyncio.create_task(_sweep_loop()) if registry is not None else None
+        )
         app.state.event_hub = InMemoryEventHub()
         app.state.levels = {lv.id: lv for lv in load_levels(settings.levels_file)}  # id → LevelInfo
         app.state.bg_tasks = set()  # ссылки на фоновые advance-задачи (иначе GC оборвёт)
@@ -57,6 +73,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             t.cancel()
         if bg:
             await asyncio.gather(*bg, return_exceptions=True)
+        if app.state.engine_sweep is not None:  # гасим sweep ПОСЛЕ отмены advance
+            app.state.engine_sweep.cancel()
+            await asyncio.gather(app.state.engine_sweep, return_exceptions=True)
         if app.state.adapter is not None:
             await app.state.adapter.close()
         await engine.dispose()

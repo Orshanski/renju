@@ -30,6 +30,10 @@ class RapfiProcess:
     def alive(self) -> bool:
         return self._proc.returncode is None
 
+    @property
+    def pid(self) -> int:
+        return self._proc.pid
+
     async def send(self, lines: list[str]) -> None:
         if not lines:
             return

@@ -1,6 +1,6 @@
 /* Гобан по prototype/index.html §GAME (.goban и слои); наши дополнения: рамка
    дебютной зоны и метки выигрышной линии (реестр отличий — в спеке среза).
-   Текстура: board_pine.jpg — Vecteezy free license, атрибуция на странице игры. */
+   Текстура: board_pine.webp (1280²) — Vecteezy free license, атрибуция на странице игры. */
 @value lineInk, vermillion, shadow, fontSerif from "../../styles/tokens.module.css";
 
 .goban {
@@ -11,7 +11,7 @@
   container-type: inline-size; /* для cqw-размеров текстовых меток (✕) */
   background:
     linear-gradient(160deg, rgba(255, 250, 238, 0.1), rgba(214, 182, 134, 0.08)),
-    url("../../assets/board_pine.jpg");
+    url("../../assets/board_pine.webp");
   background-size: cover;
   background-position: center;
   box-shadow: shadow, inset 0 0 0 2px rgba(150, 110, 60, 0.38), inset 0 2px 12px rgba(255, 248, 230, 0.45);
