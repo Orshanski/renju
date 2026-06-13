@@ -3,7 +3,7 @@ from collections.abc import Sequence
 
 from ..domain.game import undo_truncate
 from ..domain.opening import CENTER
-from ..domain.rules import outcome_after
+from ..domain.rules import outcome_after, winning_line
 from ..domain.undo import UndoPolicy, check_undo
 from ..domain.values import (
     Color,
@@ -20,6 +20,15 @@ from ..models.game import Game
 from ..rapfi.adapter import EngineError
 from .controllers import Engine, User, controller_from_json, controller_to_json
 from .players import Player, make_player
+
+
+def _final_status_payload(game: Game) -> dict:
+    """Payload финального status: статус + winning_line (ничья линии не имеет → без поля)."""
+    payload: dict = {"status": game.status}
+    wl = winning_line([tuple(m) for m in game.moves])
+    if wl is not None:
+        payload["winning_line"] = [list(p) for p in wl]
+    return payload
 
 
 class GameService:
@@ -95,7 +104,7 @@ class GameService:
             outcome = outcome_after(moves)
             if outcome is not None:
                 game.status = outcome.value
-                self._hub.publish(game.id, "status", {"status": game.status})
+                self._hub.publish(game.id, "status", _final_status_payload(game))
                 await self._repo.update(game)
                 return
             side = color_to_move(len(moves))
@@ -171,7 +180,7 @@ class GameService:
         )
         game.status = self._next_status(game, [tuple(m) for m in game.moves])
         if GameStatus(game.status).is_finished:  # ход человека завершил партию — фона не будет
-            self._hub.publish(game.id, "status", {"status": game.status})
+            self._hub.publish(game.id, "status", _final_status_payload(game))
         await self._repo.update(game)
         return game  # advance НЕ здесь: при opponent_thinking роутер запланирует фоновый прогон
 

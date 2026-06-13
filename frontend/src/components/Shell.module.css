@@ -13,10 +13,12 @@
     radial-gradient(900px 600px at -10% 110%, #e8dcc2 0%, rgba(232, 220, 194, 0) 55%),
     washi;
 }
-/* зерно васи-бумаги (в прототипе — body::before; здесь экран владеет своим хромом) */
+/* зерно васи-бумаги (в прототипе — body::before; здесь экран владеет своим хромом).
+   position: absolute (НЕ fixed) — баг WebKit: fixed + mix-blend-mode перекомпозирует
+   слой на каждый repaint контента → дёрганье панели в десктопном Safari (rj-p82). */
 .shell::before {
   content: "";
-  position: fixed;
+  position: absolute;
   inset: 0;
   pointer-events: none;
   z-index: 1;

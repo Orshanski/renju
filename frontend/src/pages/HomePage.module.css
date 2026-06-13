@@ -1,5 +1,5 @@
 /* по prototype/index.html (eyebrow/title/sub); токены — @value (tokens.module.css) */
-@value sumiSoft, vermillion, fontSerif from "../styles/tokens.module.css";
+@value sumiSoft, vermillion, vermillionDeep, shadowSm, fontSerif, fontSans from "../styles/tokens.module.css";
 
 .wrap { max-width: 1120px; margin: 0 auto; }
 .eyebrow {
@@ -16,3 +16,21 @@
 .eyebrow::before { content: ""; width: 26px; height: 1px; background: vermillion; display: inline-block; }
 .title { font-family: fontSerif; font-weight: 800; font-size: 40px; line-height: 1.05; margin: 14px 0 6px; letter-spacing: -0.5px; }
 .sub { color: sumiSoft; font-size: 15px; font-weight: 300; }
+
+.newBtn {
+  margin-top: 22px;
+  font-family: fontSans;
+  font-weight: 500;
+  font-size: 15px;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  border: none;
+  border-radius: 11px;
+  padding: 14px 22px;
+  background: vermillion;
+  color: #fbeee6;
+  box-shadow: shadowSm;
+  transition: 0.18s;
+}
+.newBtn:hover:enabled { background: vermillionDeep; transform: translateY(-1px); }
+.newBtn:disabled { opacity: 0.6; cursor: default; }
