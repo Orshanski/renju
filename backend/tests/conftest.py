@@ -99,6 +99,12 @@ class _FakeAdapter:
     async def mark_absent(self, game_id, *, reason="leave"):
         pass
 
+    async def sweep_once(self):
+        pass
+
+    async def release(self, game_id, *, reason="delete"):
+        pass
+
     async def close(self):
         pass
 

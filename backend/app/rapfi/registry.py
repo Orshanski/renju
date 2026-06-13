@@ -254,7 +254,7 @@ class EngineRegistry:
                 _log.info("spawn game=%s pid=%s level_tag=%s", game_id, proc.pid, slot.level_tag)
         if orphan is not None:
             await orphan.terminate(grace_s=self._grace)
-            raise EngineError("registry closing during spawn")
+            raise EngineError("slot evicted during spawn (registry closing or recreated)")
 
     async def _unclaim(self, slot: EngineSlot, counter: str) -> None:
         async with self._cond:

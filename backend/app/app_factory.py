@@ -49,16 +49,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             logging.getLogger("renju").warning("Rapfi bin не собран — adapter=None")
             app.state.adapter = None
 
+        registry = app.state.adapter  # sweep крутит ИМЕННО этот реестр (тесты свопают adapter)
+
         async def _sweep_loop():  # idle-таймаут: периодически гасим простаивающие процессы
+            assert registry is not None  # таск создаётся только при registry is not None
             while True:
                 await asyncio.sleep(settings.engine_sweep_interval_s)
                 try:
-                    await app.state.adapter.sweep_once()
+                    await registry.sweep_once()
                 except Exception:
                     logging.getLogger("renju.engine").exception("sweep failed")
 
         app.state.engine_sweep = (
-            asyncio.create_task(_sweep_loop()) if app.state.adapter is not None else None
+            asyncio.create_task(_sweep_loop()) if registry is not None else None
         )
         app.state.event_hub = InMemoryEventHub()
         app.state.levels = {lv.id: lv for lv in load_levels(settings.levels_file)}  # id → LevelInfo
