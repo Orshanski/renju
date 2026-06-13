@@ -1,0 +1,64 @@
+/* Карточка партии с контекстным меню; токены — @value */
+@value sumiSoft, vermillion, vermillionDeep, shadowSm, fontSerif, fontSans, washi, sumi, sumiFaint from "../styles/tokens.module.css";
+
+.card {
+  position: relative; /* якорь для .menu */
+  background: washi;
+  border-radius: 11px;
+  padding: 14px 16px;
+  box-shadow: shadowSm;
+  cursor: pointer;
+  font-family: fontSans;
+  color: sumi;
+  transition: 0.15s;
+  user-select: none;
+}
+.card:hover { transform: translateY(-1px); box-shadow: 0 8px 24px -10px rgba(40, 28, 14, 0.55); }
+
+.status {
+  font-family: fontSerif;
+  font-weight: 700;
+  font-size: 16px;
+  margin-bottom: 6px;
+}
+
+.meta {
+  display: flex;
+  gap: 10px;
+  font-size: 13px;
+  color: sumiSoft;
+  margin-bottom: 4px;
+}
+
+.date {
+  font-size: 12px;
+  color: sumiFaint;
+}
+
+.menu {
+  position: absolute; /* всплывает относительно .card (position:relative) */
+  top: calc(100% + 4px);
+  left: 0;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: shadowSm;
+  overflow: hidden;
+  z-index: 100;
+  min-width: 160px;
+}
+
+.menu [role="menuitem"] {
+  display: block;
+  width: 100%;
+  padding: 10px 16px;
+  text-align: left;
+  font-family: fontSans;
+  font-size: 14px;
+  color: sumi;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: 0.12s;
+}
+.menu [role="menuitem"]:hover:enabled { background: washi; }
+.menu [role="menuitem"]:disabled { opacity: 0.5; cursor: default; }
