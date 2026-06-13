@@ -73,3 +73,20 @@ async def test_move_when_opponent_thinking_409(app, client, games_api):
         await s.commit()
     r = await client.post(f"/api/games/{gid}/move", json={"x": 6, "y": 6})
     assert r.status_code == 409  # MoveRejected(OPPONENT_THINKING) → 409
+
+
+async def test_move_rejection_is_logged(app, client, games_api, caplog):
+    import logging
+
+    app.state.adapter = games_api.FakeAdapter()
+    await games_api.seed_login(app, client)
+    gid = (
+        await client.post("/api/games", json={"opponent": {"kind": "engine", "levelId": "master"}})
+    ).json()["id"]
+    await games_api.wait_settled(client, gid)
+    with caplog.at_level(logging.WARNING, logger="renju.games"):
+        # центр занят → OCCUPIED
+        r = await client.post(f"/api/games/{gid}/move", json={"x": 7, "y": 7})
+    assert r.status_code == 422
+    msgs = " ".join(rec.getMessage() for rec in caplog.records)
+    assert "move rejected" in msgs and "occupied" in msgs and gid in msgs
