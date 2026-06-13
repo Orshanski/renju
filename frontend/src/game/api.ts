@@ -1,5 +1,5 @@
 import { apiRequest } from "../api/client";
-import type { GameStateDTO, LevelDTO } from "./types";
+import type { GameStateDTO, GameSummaryDTO, LevelDTO, Section } from "./types";
 
 export function createGame(levelId: string): Promise<GameStateDTO> {
   return apiRequest<GameStateDTO>("POST", "/api/games", { opponent: { kind: "engine", levelId } });
@@ -29,4 +29,20 @@ export function leaveGame(id: string): Promise<{ ok: boolean }> {
 
 export function getLevels(): Promise<LevelDTO[]> {
   return apiRequest<LevelDTO[]>("GET", "/api/levels");
+}
+
+export function getGamesSummary(section: Section): Promise<GameSummaryDTO[]> {
+  return apiRequest<GameSummaryDTO[]>("GET", `/api/games/summary?section=${section}`);
+}
+
+export function favoriteGame(id: string): Promise<true> {
+  return apiRequest<true>("POST", `/api/games/${id}/favorite`);
+}
+
+export function unfavoriteGame(id: string): Promise<true> {
+  return apiRequest<true>("POST", `/api/games/${id}/unfavorite`);
+}
+
+export function deleteGame(id: string): Promise<void> {
+  return apiRequest<void>("DELETE", `/api/games/${id}`);
 }
