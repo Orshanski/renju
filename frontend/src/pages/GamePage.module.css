@@ -3,6 +3,22 @@
 
 .wrap { max-width: 1120px; margin: 0 auto; }
 .loading { color: sumiSoft; padding: 40px; text-align: center; }
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  margin-bottom: 14px;
+  cursor: pointer;
+  font-family: fontSans;
+  font-size: 13px;
+  letter-spacing: 0.3px;
+  color: sumiSoft;
+  transition: 0.18s;
+}
+.back:hover { color: vermillion; }
 .eyebrow {
   font-family: fontSerif;
   font-weight: 600;

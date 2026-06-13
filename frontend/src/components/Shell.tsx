@@ -15,7 +15,21 @@ export function Shell() {
   return (
     <div className={styles.shell}>
       <header className={styles.bar}>
-        <div className={styles.brand}>
+        {/* бренд → главный экран: выход с игрового экрана (недопорт прототипа, rj-h0y).
+            div + role/tabindex/keydown, а не <button> — тип элемента не меняем, чтобы
+            не задеть верстку шапки; доступно с клавиатуры (Enter/Space). */}
+        <div
+          className={styles.brand}
+          role="button"
+          tabIndex={0}
+          onClick={() => navigate("/")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              navigate("/");
+            }
+          }}
+        >
           <span className={styles.kanji}>連珠</span>
           <span className={styles.lat}>Renju</span>
         </div>

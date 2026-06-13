@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Board } from "../components/board/Board";
 import { getLevels } from "../game/api";
 import { canPlay, canUndo, colorToMove, openingZone, pointLabel } from "../game/legality";
@@ -27,6 +27,7 @@ function turnText(view: GameView): string {
 
 export default function GamePage() {
   const { gameId } = useParams<{ gameId: string }>();
+  const navigate = useNavigate();
   const { view, notice, play, undoMove, dismissNotice } = useGame(gameId!);
   const [levels, setLevels] = useState<LevelDTO[]>([]);
   useEffect(() => {
@@ -42,6 +43,10 @@ export default function GamePage() {
 
   return (
     <div className={styles.wrap}>
+      {/* явный выход на главный экран (логотип-клик неочевиден, rj-h0y) */}
+      <button type="button" className={styles.back} onClick={() => navigate("/")}>
+        ← К партиям
+      </button>
       <div className={styles.eyebrow}>
         Партия · ты играешь {view.yourColor ? COLOR_RU[view.yourColor] : "—"}
       </div>
