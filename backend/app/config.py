@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     busy_timeout_ms: int = 5000
     sse_heartbeat_s: int = 15
 
+    # Движковые процессы (rj-899): предварительные, калибруются. kill_grace_s — выше.
+    engine_idle_timeout_s: float = 180.0  # гасим процесс партии по неактивности
+    engine_sweep_interval_s: float = 30.0  # период idle-sweep
+
     @property
     def resolved_db_path(self) -> Path:
         return self.db_path if self.db_path is not None else self.data_dir / "db.sqlite"

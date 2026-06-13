@@ -53,3 +53,9 @@ def test_settings_auth_defaults(tmp_path, monkeypatch):
     assert s.jwt_expire_hours == 168
     assert s.cookie_name == "renju_token"
     assert s.secure_cookie is False
+
+
+def test_engine_registry_defaults():
+    s = Settings()
+    assert s.engine_idle_timeout_s > 0 and s.engine_sweep_interval_s > 0
+
