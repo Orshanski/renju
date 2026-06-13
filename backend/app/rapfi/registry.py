@@ -21,6 +21,7 @@ from .adapter import (
     _WALL_CLOCK_SLACK_S,
     EngineError,
     _move_commands,
+    incremental_move_commands,
 )
 from .process import EngineProcessDied, RapfiProcess
 from .protocol import (
@@ -30,6 +31,7 @@ from .protocol import (
     forbid_commands,
     init_commands,
     parse_line,
+    plan_sync,
 )
 
 _log = logging.getLogger("renju.engine")
@@ -60,6 +62,7 @@ class EngineSlot:
     presence: int = 0  # устройства, держащие партию открытой (гейтит триггер ВЫХОД)
     last_activity: float = 0.0
     level_tag: str = "-"
+    synced: list[Point] | None = None  # позиция движка вкл. его ход; None = не инициализирован
 
 
 class EngineRegistry:
@@ -93,25 +96,27 @@ class EngineRegistry:
         *,
         level_tag: str = "-",
     ) -> Point:
-        commands = _move_commands(moves, params, allowed_zone)
+        target: list[Point] = [(m[0], m[1]) for m in moves]  # нормализованный список Point
         timeout = params.timeout_turn_ms / 1000 + self._slack
         slot = await self._claim(game_id, level_tag, "inflight")
         t0 = self._now()  # после claim: ms = время расчёта, не spawn (spawn — своя лог-строка)
         try:
-            parsed = await self._run(slot, game_id, commands, LineKind.MOVE, timeout)
+            parsed = await self._run_move(slot, game_id, target, params, allowed_zone, timeout)
         finally:
             await self._unclaim(slot, "inflight")
         ms = int((self._now() - t0) * 1000)
         if parsed.move is None:
             _log.warning("engine_invalid_move game=%s pid=%s reason=no-move", game_id, slot.pid)
+            await self._reset_synced(slot)
             raise EngineError("engine returned no move")
-        if parsed.move in set(moves):
+        if parsed.move in set(target):
             _log.warning(
                 "engine_invalid_move game=%s pid=%s move=%s reason=occupied",
                 game_id,
                 slot.pid,
                 parsed.move,
             )
+            await self._reset_synced(slot)
             raise EngineError(f"engine returned occupied cell: {parsed.move}")
         _log.info(
             "compute_move game=%s pid=%s moves=%d -> %s ms=%d",
@@ -250,6 +255,7 @@ class EngineRegistry:
                 self._cond.notify_all()
             else:
                 slot.proc, slot.pid = proc, proc.pid
+                slot.synced = None  # свежий процесс — состояние движка неизвестно
                 slot.ready.set()
                 _log.info("spawn game=%s pid=%s level_tag=%s", game_id, proc.pid, slot.level_tag)
         if orphan is not None:
@@ -287,12 +293,76 @@ class EngineRegistry:
         assert proc is not None  # _respawn выставил slot.proc
         async with asyncio.timeout(timeout_s):
             await proc.send(commands)
-            while True:
-                parsed = parse_line(await proc.read_line())
-                if parsed.kind is want:
-                    return parsed
-                if parsed.kind is LineKind.ERROR:
-                    raise ProtocolError(parsed.text)
+            return await self._read_until(proc, want)
+
+    async def _read_until(self, proc: _EngineProc, want: LineKind) -> ParsedLine:
+        """Дренаж строк до нужного типа. Вызывать под asyncio.timeout."""
+        while True:
+            parsed = parse_line(await proc.read_line())
+            if parsed.kind is want:
+                return parsed
+            if parsed.kind is LineKind.ERROR:
+                raise ProtocolError(parsed.text)
+
+    # --- инкрементальный MOVE-путь ---
+
+    async def _run_move(
+        self,
+        slot: EngineSlot,
+        game_id: str,
+        target: list[Point],
+        params: EngineParams,
+        allowed_zone: frozenset[Point] | None,
+        timeout_s: float,
+    ) -> ParsedLine:
+        """retry-once обвязка для инкрементального хода."""
+        async with slot.io_lock:
+            try:
+                return await self._attempt_move(
+                    slot, game_id, target, params, allowed_zone, timeout_s
+                )
+            except (TimeoutError, EngineProcessDied, ProtocolError):
+                await self._respawn(slot, game_id, reason="hang")
+            try:
+                return await self._attempt_move(
+                    slot, game_id, target, params, allowed_zone, timeout_s
+                )
+            except (TimeoutError, EngineProcessDied, ProtocolError) as e:
+                await self._respawn(slot, game_id, reason="hang")
+                raise EngineError(f"engine failed twice: {e!r}") from e
+
+    async def _attempt_move(
+        self,
+        slot: EngineSlot,
+        game_id: str,
+        target: list[Point],
+        params: EngineParams,
+        allowed_zone: frozenset[Point] | None,
+        timeout_s: float,
+    ) -> ParsedLine:
+        """Один attempt: строим дельту от slot.synced, шлём, читаем ход, обновляем synced."""
+        if slot.proc is None or not slot.proc.alive:
+            await self._respawn(slot, game_id, reason="dead")  # сбросит synced=None
+        plan = plan_sync(slot.synced, target)
+        if plan.cold:
+            cmds = _move_commands(target, params, allowed_zone)
+        else:
+            cmds = incremental_move_commands(
+                plan, target=target, params=params, allowed_zone=allowed_zone
+            )
+        proc = slot.proc
+        assert proc is not None  # _respawn выставил slot.proc
+        async with asyncio.timeout(timeout_s):
+            await proc.send(cmds)
+            parsed = await self._read_until(proc, LineKind.MOVE)
+        assert parsed.move is not None  # _read_until(MOVE) гарантирует ход
+        slot.synced = [*target, parsed.move]
+        return parsed
+
+    async def _reset_synced(self, slot: EngineSlot) -> None:
+        """Сброс synced под io_lock: следующий запрос пойдёт cold."""
+        async with slot.io_lock:
+            slot.synced = None
 
     async def _respawn(self, slot: EngineSlot, game_id: str, *, reason: str) -> None:
         if slot.proc is not None:  # лог смены pid (наблюдаемость respawn, §3.1/§7)
@@ -300,6 +370,7 @@ class EngineRegistry:
             await slot.proc.terminate(grace_s=self._grace)
         slot.proc = await self._spawn(bin_path=self._bin, config_path=self._config, cwd=self._cwd)
         slot.pid = slot.proc.pid
+        slot.synced = None  # новый процесс — состояние движка неизвестно
         _log.info(
             "spawn game=%s pid=%s level_tag=%s reason=respawn", game_id, slot.pid, slot.level_tag
         )
