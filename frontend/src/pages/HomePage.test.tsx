@@ -1,48 +1,44 @@
-import { it, expect, beforeEach } from "vitest";
+import { it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { server, http, HttpResponse } from "../test/msw";
-import { FakeEventSource, installFakeEventSource } from "../test/eventsource";
 import HomePage from "./HomePage";
 
-beforeEach(() => {
-  installFakeEventSource();
-  FakeEventSource.reset();
+// HomePage сам EventSource не открывает (только GET /api/games/summary); FakeEventSource не нужен.
+function sum(id: string, section: string) {
+  return { id, status: section === "current" ? "awaiting_move" : "finished_black", section,
+    level_id: "novice", your_color: "black", move_count: 2, favorite: section === "favorite",
+    updated_at: "2026-06-13T10:00:00", finished_at: section === "current" ? null : "2026-06-12T09:00:00" };
+}
+
+it("грузит Текущие по умолчанию; таб «Завершённые» перезапрашивает свой раздел", async () => {
+  server.use(http.get("/api/games/summary", ({ request }) => {
+    const s = new URL(request.url).searchParams.get("section");
+    return HttpResponse.json(s === "current" ? [sum("c1", "current")] : [sum("f1", "finished")]);
+  }));
+  render(<MemoryRouter><Routes><Route path="*" element={<HomePage />} /></Routes></MemoryRouter>);
+  expect(await screen.findByTestId("card-c1")).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("tab", { name: /Завершённые/ }));
+  expect(await screen.findByTestId("card-f1")).toBeInTheDocument();
 });
 
-it("кнопка «Новая партия (Новичок)» создаёт партию с novice и ведёт на /game/{id}", async () => {
-  let body: unknown = null;
-  server.use(
-    http.post("/api/games", async ({ request }) => {
-      body = await request.json();
-      return HttpResponse.json({ id: "g9" }); // HomePage берёт только id
-    }),
-  );
+it("кнопка «Новая партия» ведёт на /new", async () => {
+  server.use(http.get("/api/games/summary", () => HttpResponse.json([])));
   render(
     <MemoryRouter initialEntries={["/"]}>
       <Routes>
         <Route path="/" element={<HomePage />} />
-        <Route path="/game/:gameId" element={<div>BOARD g9</div>} />
+        <Route path="/new" element={<div>NEW SCREEN</div>} />
       </Routes>
     </MemoryRouter>,
   );
-  await userEvent.click(screen.getByRole("button", { name: /новая партия/i }));
-  expect(await screen.findByText("BOARD g9")).toBeInTheDocument();
-  expect(body).toEqual({ opponent: { kind: "engine", levelId: "novice" } });
+  await userEvent.click(await screen.findByRole("button", { name: /Новая партия/ }));
+  expect(await screen.findByText("NEW SCREEN")).toBeInTheDocument();
 });
 
-it("отказ создания: кнопка снова активна, на странице остаёмся", async () => {
-  server.use(http.post("/api/games", () => HttpResponse.json({ detail: "boom" }, { status: 500 })));
-  render(
-    <MemoryRouter initialEntries={["/"]}>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-      </Routes>
-    </MemoryRouter>,
-  );
-  const btn = screen.getByRole("button", { name: /новая партия/i });
-  await userEvent.click(btn);
-  expect(await screen.findByRole("button", { name: /новая партия/i })).toBeEnabled();
-  expect(screen.getByText("Доска ждёт")).toBeInTheDocument();
+it("пустой раздел показывает заглушку", async () => {
+  server.use(http.get("/api/games/summary", () => HttpResponse.json([])));
+  render(<MemoryRouter><Routes><Route path="*" element={<HomePage />} /></Routes></MemoryRouter>);
+  expect(await screen.findByText(/Здесь пусто/)).toBeInTheDocument();
 });
