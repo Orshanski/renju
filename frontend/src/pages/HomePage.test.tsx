@@ -42,3 +42,9 @@ it("пустой раздел показывает заглушку", async () =
   render(<MemoryRouter><Routes><Route path="*" element={<HomePage />} /></Routes></MemoryRouter>);
   expect(await screen.findByText(/Здесь пусто/)).toBeInTheDocument();
 });
+
+it("ошибка загрузки раздела показывает заглушку, а не вечную загрузку", async () => {
+  server.use(http.get("/api/games/summary", () => HttpResponse.json({ detail: "boom" }, { status: 500 })));
+  render(<MemoryRouter><Routes><Route path="*" element={<HomePage />} /></Routes></MemoryRouter>);
+  expect(await screen.findByText(/Здесь пусто/)).toBeInTheDocument();
+});

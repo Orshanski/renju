@@ -1,5 +1,5 @@
 /* по prototype/index.html (eyebrow/sub); токены — @value (tokens.module.css) */
-@value sumiSoft, sumiFaint, vermillion, vermillionDeep, washi2, shadowSm, fontSerif, fontSans from "../styles/tokens.module.css";
+@value sumiSoft, sumiFaint, vermillion, vermillionDeep, shadowSm, fontSerif, fontSans from "../styles/tokens.module.css";
 
 .wrap { max-width: 1120px; margin: 0 auto; }
 
