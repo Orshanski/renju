@@ -19,7 +19,6 @@ export default function HomePage() {
 
   useEffect(() => {
     let alive = true; // guard от гонки: ответ устаревшего раздела не перетирает свежий при быстром переключении табов
-    setGames(null);
     getGamesSummary(section).then((g) => alive && setGames(g)).catch(() => alive && setGames([]));
     return () => { alive = false; };
   }, [section, reloadKey]);
