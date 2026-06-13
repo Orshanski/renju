@@ -190,6 +190,7 @@ class GameService:
                 # фолы движок соблюдает сам (RULE 4) — для его хода не запрашиваем (rj-t95)
                 fb = []
                 game.moves = [list(p) for p in apply_move(moves, mv, forbidden=fb)]
+                game.updated_at = _now()  # реальный ход движка — бампаем «когда обновлено»
             except (EngineError, MoveRejected) as e:
                 # сбой движка ИЛИ нелегальный ход движка (фол-точка) → событие error,
                 # статус остаётся opponent_thinking; §4.8-восстановление доиграет при доступе
@@ -234,6 +235,7 @@ class GameService:
         # дефолт: human-ход чёрных надо валидировать реальными фолами. (холистик 2026-06-12)
         fb = await self.fouls(game, moves)
         game.moves = [list(p) for p in apply_move(moves, point, forbidden=fb)]
+        game.updated_at = _now()  # реальный ход — бампаем «когда обновлено»
         self._hub.publish(
             game.id,
             "move",
@@ -283,6 +285,7 @@ class GameService:
         game.undo_count += 1
         game.status = GameStatus.AWAITING_MOVE.value
         game.finished_at = None
+        game.updated_at = _now()  # усечение ходов — реальное изменение партии
         self._hub.publish(game.id, "undo", {"move_count": k})
         # из лога напрямую — undo структурно без движка (не через fouls, который
         # на отсутствующем ключе чёрной позиции дёрнул бы forbidden_points)

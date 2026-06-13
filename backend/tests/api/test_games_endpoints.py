@@ -155,7 +155,7 @@ async def test_delete_game_other_user(app, client, games_api):
 
 
 async def test_favorite_finished_game(app, client, games_api):
-    """Завершённая партия: favorite → 200, section=favorite, favorite=true."""
+    """Завершённая партия: favorite → 200, тело ответа `true`."""
     from app.models.game import Game
 
     app.state.adapter = games_api.FakeAdapter()
@@ -171,9 +171,10 @@ async def test_favorite_finished_game(app, client, games_api):
         await s.commit()
     r = await client.post(f"/api/games/{gid}/favorite")
     assert r.status_code == 200
-    body = r.json()
-    assert body["favorite"] is True
-    assert body["section"] == "favorite"
+    assert r.json() is True
+    # партия реально попала в раздел «Избранное»
+    fav = (await client.get("/api/games/summary?section=favorite")).json()
+    assert any(i["id"] == gid for i in fav)
 
 
 async def test_favorite_unfinished_game_409(app, client, games_api):
@@ -189,7 +190,7 @@ async def test_favorite_unfinished_game_409(app, client, games_api):
 
 
 async def test_unfavorite_game(app, client, games_api):
-    """unfavorite → 200, favorite=false, section=finished (партия завершена)."""
+    """unfavorite → 200, тело `true`; партия возвращается в раздел «Завершённые»."""
     from app.models.game import Game
 
     app.state.adapter = games_api.FakeAdapter()
@@ -206,38 +207,43 @@ async def test_unfavorite_game(app, client, games_api):
         await s.commit()
     r = await client.post(f"/api/games/{gid}/unfavorite")
     assert r.status_code == 200
-    body = r.json()
-    assert body["favorite"] is False
-    assert body["section"] == "finished"
+    assert r.json() is True
+    # ушла из «Избранного», вернулась в «Завершённые»
+    fav = (await client.get("/api/games/summary?section=favorite")).json()
+    fin = (await client.get("/api/games/summary?section=finished")).json()
+    assert not any(i["id"] == gid for i in fav)
+    assert any(i["id"] == gid for i in fin)
 
 
-async def test_summary_list(app, client, games_api):
-    """GET /api/games/summary: массив summary-DTO с лёгкими полями."""
+async def test_summary_current_fields(app, client, games_api):
+    """GET /api/games/summary?section=current: лёгкий summary-DTO без тяжёлых полей."""
     app.state.adapter = games_api.FakeAdapter()
     await games_api.seed_login(app, client)
 
-    # создаём партию
     gid = (
         await client.post("/api/games", json={"opponent": {"kind": "engine", "levelId": "master"}})
     ).json()["id"]
     await games_api.wait_settled(client, gid)
 
-    r = await client.get("/api/games/summary")
+    r = await client.get("/api/games/summary?section=current")
     assert r.status_code == 200
     items = r.json()
     assert isinstance(items, list) and len(items) >= 1
 
     item = next(i for i in items if i["id"] == gid)
     # обязательные лёгкие поля
-    assert "id" in item
-    assert "status" in item
-    assert "section" in item
-    assert "level_id" in item
-    assert "your_color" in item
-    assert "move_count" in item
-    assert "favorite" in item
-    assert "updated_at" in item
-    assert "finished_at" in item
+    for field in (
+        "id",
+        "status",
+        "section",
+        "level_id",
+        "your_color",
+        "move_count",
+        "favorite",
+        "updated_at",
+        "finished_at",
+    ):
+        assert field in item
 
     # move_count — число (не массив)
     assert isinstance(item["move_count"], int)
@@ -250,39 +256,115 @@ async def test_summary_list(app, client, games_api):
 
     # текущая незавершённая партия → section=current
     assert item["section"] == "current"
-
-    # level_id содержит строку (engine-уровень)
     assert item["level_id"] == "master"
 
 
-async def test_summary_sections(app, client, games_api):
-    """Summary корректно отражает section: finished и favorite."""
+async def test_summary_filter_by_section(app, client, games_api):
+    """section фильтрует: current → только текущие, finished/favorite — свои разделы."""
     from app.models.game import Game
 
     app.state.adapter = games_api.FakeAdapter()
     await games_api.seed_login(app, client)
 
+    async def make_game():
+        gid = (
+            await client.post(
+                "/api/games", json={"opponent": {"kind": "engine", "levelId": "master"}}
+            )
+        ).json()["id"]
+        await games_api.wait_settled(client, gid)
+        return gid
+
+    cur = await make_game()  # остаётся current
+    fin = await make_game()  # завершим
+    fav = await make_game()  # завершим + в избранное
+
+    async with app.state.sessionmaker() as s:
+        g_fin = await s.get(Game, fin)
+        g_fin.status = "finished_black"
+        g_fav = await s.get(Game, fav)
+        g_fav.status = "finished_white"
+        g_fav.favorite = True
+        await s.commit()
+
+    cur_ids = {i["id"] for i in (await client.get("/api/games/summary?section=current")).json()}
+    fin_ids = {i["id"] for i in (await client.get("/api/games/summary?section=finished")).json()}
+    fav_ids = {i["id"] for i in (await client.get("/api/games/summary?section=favorite")).json()}
+
+    assert cur in cur_ids and fin not in cur_ids and fav not in cur_ids
+    assert fin in fin_ids and cur not in fin_ids and fav not in fin_ids
+    assert fav in fav_ids and cur not in fav_ids and fin not in fav_ids
+
+
+async def test_summary_invalid_section_422(app, client, games_api):
+    """Невалидный section → 422 (валидация enum FastAPI)."""
+    app.state.adapter = games_api.FakeAdapter()
+    await games_api.seed_login(app, client)
+    r = await client.get("/api/games/summary?section=bogus")
+    assert r.status_code == 422
+
+
+async def test_summary_missing_section_422(app, client, games_api):
+    """section обязателен → без него 422."""
+    app.state.adapter = games_api.FakeAdapter()
+    await games_api.seed_login(app, client)
+    r = await client.get("/api/games/summary")
+    assert r.status_code == 422
+
+
+async def test_favorite_does_not_bump_updated_at(app, client, games_api):
+    """Пометка в избранное НЕ меняет updated_at (бампается только реальным ходом)."""
+    from app.models.game import Game
+
+    app.state.adapter = games_api.FakeAdapter()
+    await games_api.seed_login(app, client)
     gid = (
         await client.post("/api/games", json={"opponent": {"kind": "engine", "levelId": "master"}})
     ).json()["id"]
-    await games_api.wait_settled(client, gid)  # дождаться хода движка
-
-    # завершённая → section=finished
+    await games_api.wait_settled(client, gid)
     async with app.state.sessionmaker() as s:
         g = await s.get(Game, gid)
         g.status = "finished_black"
         await s.commit()
 
-    r = await client.get("/api/games/summary")
-    item = next(i for i in r.json() if i["id"] == gid)
-    assert item["section"] == "finished"
+    before = next(
+        i
+        for i in (await client.get("/api/games/summary?section=finished")).json()
+        if i["id"] == gid
+    )["updated_at"]
 
-    # избранная → section=favorite
-    async with app.state.sessionmaker() as s:
-        g = await s.get(Game, gid)
-        g.favorite = True
-        await s.commit()
+    assert (await client.post(f"/api/games/{gid}/favorite")).status_code == 200
 
-    r = await client.get("/api/games/summary")
-    item = next(i for i in r.json() if i["id"] == gid)
-    assert item["section"] == "favorite"
+    after = next(
+        i
+        for i in (await client.get("/api/games/summary?section=favorite")).json()
+        if i["id"] == gid
+    )["updated_at"]
+
+    assert before == after  # favorite не трогает «когда обновлено»
+
+
+async def test_real_move_bumps_updated_at(app, client, games_api):
+    """Реальный ход человека бампает updated_at."""
+    app.state.adapter = games_api.FakeAdapter()
+    await games_api.seed_login(app, client)
+    gid = (
+        await client.post("/api/games", json={"opponent": {"kind": "engine", "levelId": "master"}})
+    ).json()["id"]
+    st = await games_api.wait_settled(client, gid)
+    assert st["status"] == "awaiting_move"
+
+    before = next(
+        i for i in (await client.get("/api/games/summary?section=current")).json() if i["id"] == gid
+    )["updated_at"]
+
+    pt = games_api.free_move(st)
+    mv = await client.post(f"/api/games/{gid}/move", json={"x": pt[0], "y": pt[1]})
+    assert mv.status_code == 202
+    await games_api.wait_settled(client, gid)
+
+    after = next(
+        i for i in (await client.get("/api/games/summary?section=current")).json() if i["id"] == gid
+    )["updated_at"]
+
+    assert after > before  # ход обновил «когда обновлено»

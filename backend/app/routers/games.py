@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..auth import CurrentUser, decode_token, fetch_token_epoch, get_current_user
 from ..db.deps import get_session
-from ..domain.retention import game_section
+from ..domain.retention import Section, game_section
 from ..domain.rules import winning_line
 from ..domain.values import GameStatus, MoveRejected, UndoRejected
 from ..exceptions import BadInputError
@@ -102,17 +102,6 @@ def _engine_level_id(controllers: dict) -> str | None:
     return None
 
 
-def _loaded(game, attr: str):
-    """Значение атрибута БЕЗ неявного async-lazy-load: server-onupdate колонка
-    (updated_at) после commit помечена expired, а её чтение в sync-проперти дёрнуло бы
-    DB-round-trip (MissingGreenlet). На горячем пути refresh нам не нужен — для summary
-    хватит того, что уже в identity map; expired → None (значение косметическое)."""
-    from sqlalchemy import inspect as _inspect
-
-    state = _inspect(game)
-    return getattr(game, attr) if attr not in state.unloaded else None
-
-
 def _summary(game, user_id: int) -> GameSummaryDTO:
     return GameSummaryDTO(
         id=game.id,
@@ -122,7 +111,7 @@ def _summary(game, user_id: int) -> GameSummaryDTO:
         your_color=_your_color(game.controllers, user_id),
         move_count=len(game.moves),
         favorite=game.favorite,
-        updated_at=_loaded(game, "updated_at"),
+        updated_at=game.updated_at,
         finished_at=game.finished_at,
     )
 
@@ -189,12 +178,15 @@ async def list_games(
 
 @router.get("/games/summary", response_model=list[GameSummaryDTO])
 async def list_games_summary(
+    section: Section,  # обязательный фильтр (current|finished|favorite); невалидное → 422
     request: Request,
     user: Annotated[CurrentUser, Depends(current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ):
     games = await _service(request, session).list_games(user.user_id)
-    return [_summary(g, user.user_id) for g in games]
+    return [
+        _summary(g, user.user_id) for g in games if game_section(g.status, g.favorite) is section
+    ]
 
 
 @router.delete("/games/{game_id}", status_code=204)
@@ -214,8 +206,8 @@ async def favorite_game(
     user: Annotated[CurrentUser, Depends(current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ):
-    game = await _service(request, session).favorite_game(game_id, user.user_id)
-    return _summary(game, user.user_id)
+    await _service(request, session).favorite_game(game_id, user.user_id)
+    return True
 
 
 @router.post("/games/{game_id}/unfavorite")
@@ -225,8 +217,8 @@ async def unfavorite_game(
     user: Annotated[CurrentUser, Depends(current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ):
-    game = await _service(request, session).unfavorite_game(game_id, user.user_id)
-    return _summary(game, user.user_id)
+    await _service(request, session).unfavorite_game(game_id, user.user_id)
+    return True
 
 
 @router.get("/games/{game_id}")
