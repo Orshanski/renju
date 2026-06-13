@@ -28,6 +28,26 @@ it("показывает имя пользователя и контент", asy
   expect(screen.getByText("HOME")).toBeInTheDocument();
 });
 
+it("клик по бренду → переход на главный экран (выход из партии)", async () => {
+  server.use(http.get("/api/auth/me", () => HttpResponse.json({ id: 1, username: "alice", role: "user" })));
+  render(
+    <AuthProvider>
+      <MemoryRouter initialEntries={["/game/g1"]}>
+        <Routes>
+          <Route element={<Shell />}>
+            <Route path="/" element={<div>HOME</div>} />
+            <Route path="/game/:id" element={<div>GAME</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    </AuthProvider>,
+  );
+  await waitFor(() => expect(screen.getByText("alice")).toBeInTheDocument());
+  expect(screen.getByText("GAME")).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: /連珠|renju/i }));
+  await waitFor(() => expect(screen.getByText("HOME")).toBeInTheDocument());
+});
+
 it("клик «выйти» → logout → редирект на /login", async () => {
   server.use(
     http.get("/api/auth/me", () => HttpResponse.json({ id: 1, username: "alice", role: "user" })),
