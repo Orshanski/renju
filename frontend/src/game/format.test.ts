@@ -8,7 +8,7 @@ it("statusLabel: текущая — по твоему ходу; завершён
   expect(statusLabel("finished_white", "black")).toBe("Поражение");
   expect(statusLabel("finished_white", "white")).toBe("Победа");
   expect(statusLabel("finished_black", "white")).toBe("Поражение");
-  expect(statusLabel("finished_black", null)).toBe("Поражение");
+  expect(statusLabel("finished_black", null)).toBe("Завершено");
   expect(statusLabel("finished_draw", "black")).toBe("Ничья");
 });
 

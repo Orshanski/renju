@@ -78,3 +78,37 @@ it("long-tap ТОЛЬКО на тач: touch-pointerdown открывает ме
     vi.useRealTimers();
   }
 });
+
+it("slop отменяет long-tap: движение > 10px до таймаута → меню не открылось", () => {
+  const makePointerEv = (type: string, pointerType: string, x: number, y: number) => {
+    const ev = createEvent[type as "pointerDown"](document.body);
+    Object.defineProperty(ev, "pointerType", { value: pointerType });
+    Object.defineProperty(ev, "clientX", { value: x });
+    Object.defineProperty(ev, "clientY", { value: y });
+    return ev;
+  };
+  vi.useFakeTimers();
+  try {
+    render(<GameCard game={finished} onOpen={() => {}} onChanged={() => {}} />);
+    const card = screen.getByTestId("card-g1");
+    // touch down в (0,0)
+    const evDown = makePointerEv("pointerDown", "touch", 0, 0);
+    fireEvent(card, evDown);
+    // move > 10px
+    const evMove = makePointerEv("pointerMove", "touch", 15, 0);
+    fireEvent(card, evMove);
+    // таймаут истёк — но таймер уже отменён
+    act(() => { vi.advanceTimersByTime(600); });
+    expect(screen.queryByRole("menu")).toBeNull();
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it("Escape закрывает меню", async () => {
+  render(<GameCard game={finished} onOpen={() => {}} onChanged={() => {}} />);
+  fireEvent.contextMenu(screen.getByTestId("card-g1"));
+  expect(await screen.findByRole("menu")).toBeInTheDocument();
+  fireEvent.keyDown(document, { key: "Escape" });
+  expect(screen.queryByRole("menu")).toBeNull();
+});

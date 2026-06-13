@@ -12,6 +12,8 @@
   color: sumi;
   transition: 0.15s;
   user-select: none;
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
 }
 .card:hover { box-shadow: 0 8px 24px -10px rgba(40, 28, 14, 0.55); }
 
@@ -35,17 +37,15 @@
   color: sumiFaint;
 }
 
-.backdrop { position: fixed; inset: 0; z-index: 90; } /* перехват клика вне меню → dismiss */
+.backdrop { position: fixed; inset: 0; z-index: 1000; } /* перехват клика вне меню → dismiss */
 
 .menu {
-  position: absolute; /* всплывает относительно .card (position:relative) */
-  top: calc(100% + 4px);
-  left: 0;
+  position: fixed; /* координаты приходят инлайном через style; портал в body */
   background: paper; /* светлая тёплая поверхность — отделяется от washi-карточки под ней */
   border-radius: 8px;
   box-shadow: shadowSm;
   overflow: hidden;
-  z-index: 100;
+  z-index: 1001;
   min-width: 160px;
 }
 

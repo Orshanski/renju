@@ -4,6 +4,7 @@ export function statusLabel(status: GameStatus, your: Color | null): string {
   if (status === "awaiting_move") return "Твой ход";
   if (status === "opponent_thinking") return "Ход соперника";
   if (status === "finished_draw") return "Ничья";
+  if (your === null) return "Завершено";
   const winner: Color = status === "finished_black" ? "black" : "white";
   return your === winner ? "Победа" : "Поражение";
 }
