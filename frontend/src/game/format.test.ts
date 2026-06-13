@@ -6,6 +6,9 @@ it("statusLabel: текущая — по твоему ходу; завершён
   expect(statusLabel("opponent_thinking", "black")).toBe("Ход соперника");
   expect(statusLabel("finished_black", "black")).toBe("Победа");
   expect(statusLabel("finished_white", "black")).toBe("Поражение");
+  expect(statusLabel("finished_white", "white")).toBe("Победа");
+  expect(statusLabel("finished_black", "white")).toBe("Поражение");
+  expect(statusLabel("finished_black", null)).toBe("Поражение");
   expect(statusLabel("finished_draw", "black")).toBe("Ничья");
 });
 
@@ -15,4 +18,5 @@ it("sectionDateLabel: текущая — обновлено(updated_at); зав�
   expect(sectionDateLabel("finished", s)).toMatch(/^Завершено /);
   expect(sectionDateLabel("favorite", s)).toMatch(/^Завершено /);
   expect(sectionDateLabel("current", { updated_at: null, finished_at: null })).toBe("");
+  expect(sectionDateLabel("finished", { updated_at: null, finished_at: null })).toBe("");
 });
