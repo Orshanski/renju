@@ -71,15 +71,21 @@ export default function GamePage() {
               <span
                 className={`${styles.bigstone} ${toMove === "black" ? styles.bigBlack : styles.bigWhite}`}
               />
-              <div className={styles.who}>{turnText(view)}</div>
-            </div>
-            {view.status === "opponent_thinking" && (
-              <div className={styles.thinking}>
-                <span className={styles.dot} />
-                <span className={styles.dot} />
-                <span className={styles.dot} /> соперник думает…
+              {/* индикатор «думает» — в той же строке, не вторым блоком: высота карточки
+                  не прыгает (держится камнем-индикатором), текст может мигать (rj-p82) */}
+              <div className={styles.who}>
+                {view.status === "opponent_thinking" ? (
+                  <span className={styles.thinking}>
+                    <span className={styles.dot} />
+                    <span className={styles.dot} />
+                    <span className={styles.dot} />
+                    соперник думает…
+                  </span>
+                ) : (
+                  turnText(view)
+                )}
               </div>
-            )}
+            </div>
           </div>
           <div className={styles.card}>
             <div className={styles.kv}>

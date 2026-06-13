@@ -36,7 +36,8 @@
   background: radial-gradient(circle at 33% 28%, #fdfbf6, #cfc8b8);
   box-shadow: inset 0 0 0 1px rgba(120, 100, 70, 0.3);
 }
-.thinking { display: flex; align-items: center; gap: 9px; color: vermillion; font-size: 14px; margin-top: 12px; font-weight: 500; }
+/* inline в строке «чей ход» — без отдельного блока/margin, чтобы высота не прыгала */
+.thinking { display: inline-flex; align-items: center; gap: 9px; color: vermillion; font-family: fontSans; font-size: 15px; font-weight: 500; }
 .dot { width: 7px; height: 7px; border-radius: 50%; background: vermillion; animation: bnc 1s infinite ease-in-out; }
 .dot:nth-child(2) { animation-delay: 0.15s; }
 .dot:nth-child(3) { animation-delay: 0.3s; }
