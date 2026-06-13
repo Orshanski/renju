@@ -122,8 +122,8 @@ class GameService:
             try:
                 mv = await players[side].take_turn(moves)
                 assert mv is not None  # engine-сторона всегда даёт ход (None только у Interactive)
-                # фолы только на ход чёрных (forbidden_points тоже может бросить EngineError)
-                fb = await self.fouls(game, moves) if side is Color.BLACK else []
+                # фолы движок соблюдает сам (RULE 4) — для его хода не запрашиваем (rj-t95)
+                fb = []
                 game.moves = [list(p) for p in apply_move(moves, mv, forbidden=fb)]
             except (EngineError, MoveRejected) as e:
                 # сбой движка ИЛИ нелегальный ход движка (фол-точка) → событие error,

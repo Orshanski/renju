@@ -4,11 +4,16 @@ from app.domain.engine_params import EngineParams
 from app.rapfi.protocol import (
     LineKind,
     ProtocolError,
+    SyncPlan,
     block_commands,
     forbid_commands,
     init_commands,
     parse_line,
+    plan_sync,
     position_commands,
+    takeback_commands,
+    tunable_commands,
+    turn_commands,
 )
 
 
@@ -133,3 +138,48 @@ def test_block_commands_rejects_non_int_and_out_of_board():
     for bad in [(7.0, 7), (True, 3), (15, 0), (-1, 3)]:
         with pytest.raises(ProtocolError):
             block_commands([bad])  # type: ignore[list-item]
+
+
+def test_plan_sync_cold_when_synced_none():
+    assert plan_sync(None, [(7, 7), (8, 8)]).cold
+
+
+def test_plan_sync_forward_single_turn():
+    synced = [(7, 7), (6, 6), (8, 8)]
+    target = [(7, 7), (6, 6), (8, 8), (9, 9)]
+    assert plan_sync(synced, target) == SyncPlan(cold=False, takebacks=(), turn=(9, 9))
+
+
+def test_plan_sync_undo_then_move_takes_back_to_prefix():
+    synced = [(7, 7), (6, 6), (8, 8)]
+    target = [(7, 7), (9, 9)]
+    expected = SyncPlan(cold=False, takebacks=((8, 8), (6, 6)), turn=(9, 9))
+    assert plan_sync(synced, target) == expected
+
+
+def test_plan_sync_anomaly_tail_zero_is_cold():
+    assert plan_sync([(7, 7), (8, 8), (9, 9)], [(7, 7), (8, 8)]).cold
+
+
+def test_plan_sync_anomaly_tail_gt_one_is_cold():
+    assert plan_sync([(7, 7)], [(7, 7), (8, 8), (9, 9)]).cold
+
+
+def test_tunable_commands_per_move_info():
+    assert tunable_commands(EngineParams(strength=7, timeout_turn_ms=1500)) == [
+        "INFO strength 7",
+        "INFO timeout_turn 1500",
+    ]
+
+
+def test_turn_command_format():
+    assert turn_commands((8, 7)) == ["TURN 8,7"]
+
+
+def test_takeback_commands_format_and_order():
+    assert takeback_commands([(9, 9), (6, 6)]) == ["TAKEBACK 9,9", "TAKEBACK 6,6"]
+
+
+def test_takeback_commands_validates_coords():
+    with pytest.raises(ProtocolError):
+        takeback_commands([(15, 0)])

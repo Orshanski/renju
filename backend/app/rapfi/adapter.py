@@ -1,39 +1,46 @@
-"""Фасад движка: «дай ход» и «дай фолы». Владеет процессом Rapfi.
+"""Хелперы протокола Rapfi: команды движка и обработка ошибок.
 
-Гарантии:
-- одновременно выполняется не больше одного расчёта (asyncio.Lock);
-- перед каждым расчётом движок переинициализируется (START/INFO/позиция);
-- зависший или умерший процесс убивается по wall-clock таймауту и
-  пересоздаётся; запрос повторяется один раз, дальше — EngineError.
+Используются EngineRegistry (registry.py).
 """
 
-import asyncio
 from collections.abc import Sequence
-from pathlib import Path
 
 from ..domain.engine_params import EngineParams
 from ..domain.values import BOARD_SIZE, Point
-from .process import EngineProcessDied, RapfiProcess
 from .protocol import (
-    LineKind,
-    ParsedLine,
-    ProtocolError,
+    SyncPlan,
     block_commands,
-    forbid_commands,
     init_commands,
-    parse_line,
     position_commands,
+    takeback_commands,
+    tunable_commands,
+    turn_commands,
 )
 
 # Сколько добавить к timeout_turn движка до wall-clock kill: движок укладывается
 # в свой бюджет сам, запас покрывает инициализацию (загрузку весов) и парсинг.
 _WALL_CLOCK_SLACK_S = 5.0
 _FORBID_TIMEOUT_S = 10.0
-_FORBID_PARAMS = EngineParams(strength=100, timeout_turn_ms=1000)
 
 
 class EngineError(Exception):
     """Движок не смог посчитать (после повтора). Несёт текст причины."""
+
+
+def _zone_block(moves: Sequence[Point], allowed_zone: frozenset[Point] | None) -> list[str]:
+    """YXBLOCK-блок: все свободные клетки вне зоны. [] если зоны нет."""
+    if allowed_zone is None:
+        return []
+    if not allowed_zone:
+        raise ValueError("allowed_zone must be None or non-empty")
+    occupied = set(moves)
+    block = [
+        (x, y)
+        for x in range(BOARD_SIZE)
+        for y in range(BOARD_SIZE)
+        if (x, y) not in allowed_zone and (x, y) not in occupied
+    ]
+    return block_commands(block)
 
 
 def _move_commands(
@@ -41,118 +48,37 @@ def _move_commands(
     params: EngineParams,
     allowed_zone: frozenset[Point] | None,
 ) -> list[str]:
-    """init + (опц. YXBLOCK вне зоны) + позиция + (опц. YXBLOCKRESET хвостом).
+    """COLD: init(START+INFO) + [YXBLOCK] + BOARD(moves) + [YXBLOCKRESET].
 
     Блок — свободные клетки вне зоны (all − занятые − зона). Парность гарантирует:
     блок живёт только внутри этого запроса, в памяти движка между запросами ничего
     не остаётся (START blockMoves не чистит — поэтому снимаем явно)."""
-    if allowed_zone is not None and not allowed_zone:
-        raise ValueError("allowed_zone must be None or non-empty")
     commands = init_commands(params)
-    if allowed_zone is not None:
-        occupied = set(moves)
-        block = [
-            (x, y)
-            for x in range(BOARD_SIZE)
-            for y in range(BOARD_SIZE)
-            if (x, y) not in allowed_zone and (x, y) not in occupied
-        ]
-        commands += block_commands(block)
-    commands += position_commands(moves)
-    if allowed_zone is not None:
+    block = _zone_block(moves, allowed_zone)
+    commands += block + position_commands(moves)
+    if block:
         commands += ["YXBLOCKRESET"]
     return commands
 
 
-class RapfiAdapter:
-    def __init__(
-        self,
-        *,
-        bin_path: Path,
-        config_path: Path,
-        cwd: Path,
-        kill_grace_s: float = 2.0,
-        wall_clock_slack_s: float = _WALL_CLOCK_SLACK_S,
-    ):
-        self._bin_path = bin_path
-        self._config_path = config_path
-        self._cwd = cwd
-        self._kill_grace_s = kill_grace_s
-        self._wall_clock_slack_s = wall_clock_slack_s
-        self._lock = asyncio.Lock()
-        self._proc: RapfiProcess | None = None
+def incremental_move_commands(
+    plan: SyncPlan,
+    *,
+    target: Sequence[Point],
+    params: EngineParams,
+    allowed_zone: frozenset[Point] | None,
+) -> list[str]:
+    """Тёплый ход: TAKEBACK(хвост) → per-move INFO → [YXBLOCK]→TURN→[YXBLOCKRESET].
 
-    async def compute_move(
-        self,
-        moves: Sequence[Point],
-        params: EngineParams,
-        allowed_zone: frozenset[Point] | None = None,
-    ) -> Point:
-        """Ход движка для позиции. allowed_zone (если задан) — много-клеточная зона,
-        вне которой движок блокируется на этот запрос (YXBLOCK … YXBLOCKRESET)."""
-        commands = _move_commands(moves, params, allowed_zone)
-        timeout = params.timeout_turn_ms / 1000 + self._wall_clock_slack_s
-        async with self._lock:
-            parsed = await self._request(commands, LineKind.MOVE, timeout)
-        if parsed.move is None:
-            raise EngineError("engine returned no move")
-        if parsed.move in set(moves):
-            raise EngineError(f"engine returned occupied cell: {parsed.move}")
-        return parsed.move
-
-    async def forbidden_points(self, moves: Sequence[Point]) -> list[Point]:
-        """Запрещённые точки для чёрных. Непусто только когда ход чёрных."""
-        if len(moves) % 2 != 0:
-            return []
-        commands = init_commands(_FORBID_PARAMS) + forbid_commands(moves)
-        async with self._lock:
-            parsed = await self._request(commands, LineKind.FORBID, _FORBID_TIMEOUT_S)
-        if parsed.forbidden is None:
-            raise EngineError("engine returned no forbidden list")
-        return list(parsed.forbidden)
-
-    async def close(self) -> None:
-        async with self._lock:
-            if self._proc is not None:
-                await self._proc.terminate(grace_s=self._kill_grace_s)
-                self._proc = None
-
-    # --- внутреннее -----------------------------------------------------
-
-    async def _request(self, commands: list[str], want: LineKind, timeout_s: float) -> ParsedLine:
-        """Одна попытка + один повтор на свежем процессе. Вызывать под self._lock."""
-        try:
-            return await self._attempt(commands, want, timeout_s)
-        except (TimeoutError, EngineProcessDied, ProtocolError):
-            await self._kill_proc()
-        try:
-            return await self._attempt(commands, want, timeout_s)
-        except (TimeoutError, EngineProcessDied, ProtocolError) as e:
-            await self._kill_proc()
-            raise EngineError(f"engine failed twice: {e!r}") from e
-
-    async def _attempt(self, commands: list[str], want: LineKind, timeout_s: float) -> ParsedLine:
-        # spawn намеренно вне asyncio.timeout: create_subprocess_exec не блокирует
-        # (веса грузятся лениво на первой stdin-команде, уже под таймаутом ниже).
-        # Не переносить блокирующую работу в _ensure_proc — сбежит от wall-clock.
-        proc = await self._ensure_proc()
-        async with asyncio.timeout(timeout_s):
-            await proc.send(commands)
-            while True:
-                parsed = parse_line(await proc.read_line())
-                if parsed.kind is want:
-                    return parsed
-                if parsed.kind is LineKind.ERROR:
-                    raise ProtocolError(parsed.text)
-
-    async def _ensure_proc(self) -> RapfiProcess:
-        if self._proc is None or not self._proc.alive:
-            self._proc = await RapfiProcess.spawn(
-                bin_path=self._bin_path, config_path=self._config_path, cwd=self._cwd
-            )
-        return self._proc
-
-    async def _kill_proc(self) -> None:
-        if self._proc is not None:
-            await self._proc.terminate(grace_s=self._kill_grace_s)
-            self._proc = None
+    Зона берётся от target (клетка хода человека ∈ target → не блокируется)."""
+    assert not plan.cold and plan.turn is not None
+    block = _zone_block(target, allowed_zone)
+    cmds = [
+        *takeback_commands(plan.takebacks),
+        *tunable_commands(params),
+        *block,
+        *turn_commands(plan.turn),
+    ]
+    if block:
+        cmds.append("YXBLOCKRESET")
+    return cmds

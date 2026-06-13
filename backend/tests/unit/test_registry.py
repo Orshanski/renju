@@ -204,6 +204,145 @@ async def test_sweep_skips_inflight():
     await reg.close()
 
 
+# --- Task 3 (rj-t95): инкрементальный sync позиции ---
+
+
+@pytest.mark.asyncio
+async def test_first_move_cold_board_sets_synced():
+    procs = []
+
+    async def spawn(**kw):
+        p = FakeProc(["8,8"])
+        procs.append(p)
+        return p
+
+    reg = make_registry(spawn)
+    await reg.compute_move("g", [(7, 7)], P)
+    sent = [c for batch in procs[0].sent for c in batch]
+    assert "START 15" in sent and "BOARD" in sent
+    assert reg._slots["g"].synced == [(7, 7), (8, 8)]
+    await reg.close()
+
+
+@pytest.mark.asyncio
+async def test_second_move_incremental_turn_no_newgame():
+    procs = []
+
+    async def spawn(**kw):
+        p = FakeProc(["8,8", "5,5"])
+        procs.append(p)
+        return p
+
+    reg = make_registry(spawn)
+    await reg.compute_move("g", [(7, 7)], P)
+    procs[0].sent.clear()
+    await reg.compute_move("g", [(7, 7), (8, 8), (6, 6)], P)
+    sent = [c for batch in procs[0].sent for c in batch]
+    assert "START 15" not in sent and "TURN 6,6" in sent
+    assert reg._slots["g"].synced == [(7, 7), (8, 8), (6, 6), (5, 5)]
+    await reg.close()
+
+
+@pytest.mark.asyncio
+async def test_undo_path_takeback_to_prefix_then_turn():
+    procs = []
+
+    async def spawn(**kw):
+        p = FakeProc(["8,8", "4,4"])
+        procs.append(p)
+        return p
+
+    reg = make_registry(spawn)
+    await reg.compute_move("g", [(7, 7), (6, 6)], P)
+    procs[0].sent.clear()
+    await reg.compute_move("g", [(7, 7), (9, 9)], P)
+    sent = [c for batch in procs[0].sent for c in batch]
+    assert sent.count("START 15") == 0
+    assert "TAKEBACK 8,8" in sent and "TAKEBACK 6,6" in sent and "TURN 9,9" in sent
+    assert reg._slots["g"].synced == [(7, 7), (9, 9), (4, 4)]
+    await reg.close()
+
+
+@pytest.mark.asyncio
+async def test_respawn_resets_synced_to_cold():
+    # после смерти процесса следующий запрос идёт COLD (synced сброшен)
+    procs = []
+    # первый proc отвечает "8,8" (ход на запрос [(7,7)]),
+    # второй (после respawn) отвечает "9,9" (ход на запрос [(7,7),(8,8),(6,6)])
+    answers = [["8,8"], ["9,9"]]
+
+    async def spawn(**kw):
+        p = FakeProc(answers[len(procs)])
+        procs.append(p)
+        return p
+
+    reg = make_registry(spawn)
+    await reg.compute_move("g", [(7, 7)], P)  # synced=[(7,7),(8,8)]
+    await procs[0].terminate(grace_s=0.01)  # внешняя смерть
+    await reg.compute_move("g", [(7, 7), (8, 8), (6, 6)], P)  # proc мёртв → respawn → COLD
+    sent = [c for batch in procs[1].sent for c in batch]
+    assert "START 15" in sent and "BOARD" in sent  # cold (не TURN), т.к. synced сброшен
+    await reg.close()
+
+
+@pytest.mark.asyncio
+async def test_post_lock_invalid_move_resets_synced():
+    # движок вернул ЗАНЯТУЮ клетку → EngineError, synced сброшен в None (следующий cold)
+    import pytest as _pt
+
+    from app.rapfi.adapter import EngineError
+
+    async def spawn(**kw):
+        return FakeProc(["7,7"])  # вернёт уже занятую (7,7)
+
+    reg = make_registry(spawn)
+    with _pt.raises(EngineError):
+        await reg.compute_move("g", [(7, 7)], P)
+    assert reg._slots["g"].synced is None
+    await reg.close()
+
+
+# --- Task 4 (rj-t95): инкрементальный forbidden_points ---
+
+
+@pytest.mark.asyncio
+async def test_forbid_warm_only_yxshowforbid():
+    procs = []
+
+    async def spawn(**kw):
+        p = FakeProc(["8,8", "FORBID ."])
+        procs.append(p)
+        return p
+
+    reg = make_registry(spawn)
+    await reg.compute_move("g", [(7, 7)], P)  # synced=[(7,7),(8,8)] — чёрный к ходу
+    procs[0].sent.clear()
+    await reg.forbidden_points("g", [(7, 7), (8, 8)])  # == synced → тёплый
+    sent = [c for batch in procs[0].sent for c in batch]
+    assert sent == ["YXSHOWFORBID"]  # ни START, ни YXBOARD, ни INFO
+    assert reg._slots["g"].synced == [(7, 7), (8, 8)]  # не тронут (read-only)
+    await reg.close()
+
+
+@pytest.mark.asyncio
+async def test_forbid_cold_when_synced_none():
+    procs = []
+
+    async def spawn(**kw):
+        p = FakeProc(["FORBID ."])
+        procs.append(p)
+        return p
+
+    reg = make_registry(spawn)
+    # synced=None → cold: START создаёт доску движка, затем YXBOARD+YXSHOWFORBID
+    await reg.forbidden_points("g", [(7, 7), (8, 8)])
+    sent = [c for batch in procs[0].sent for c in batch]
+    assert "START 15" in sent and "YXBOARD" in sent and "YXSHOWFORBID" in sent
+    assert not any(s.startswith("INFO strength") for s in sent)  # без tunable (форбид не думает)
+    assert reg._slots["g"].synced == [(7, 7), (8, 8)]
+    await reg.close()
+
+
 # --- Task 6: лог-контракт ---
 
 

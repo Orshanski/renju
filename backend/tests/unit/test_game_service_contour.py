@@ -126,32 +126,6 @@ async def test_advance_engine_error_publishes_error_event():
     assert any(e["type"] == "error" for e in svc._hub._log.get(g.id, []))
 
 
-async def test_advance_engine_black_forbidden_move_errors():
-    # движок играет ЧЁРНЫМ и возвращает фол-точку → apply_move(FORBIDDEN) должно стать
-    # событием error, а не вылететь исключением; статус остаётся opponent_thinking
-    from app.models.game import Game
-
-    svc = _svc()
-    svc._adapter.forbid = [(5, 5)]
-    svc._adapter.move = (5, 5)  # движок возвращает ровно фол-точку
-    g = Game(
-        id="g",
-        owner_id=1,
-        moves=[[7, 7], [8, 8]],
-        undo_count=0,
-        forbidden_log={},
-        controllers={
-            "black": {"kind": "engine", "level_id": "master"},
-            "white": {"kind": "user", "user_id": 1},
-        },
-        status="opponent_thinking",
-    )
-    await svc._repo.create(g)
-    await svc.advance(g)  # не должно бросить
-    assert g.status == "opponent_thinking"
-    assert any(e["type"] == "error" for e in svc._hub._log.get(g.id, []))
-
-
 async def test_submit_move_then_engine_replies_via_advance():
     svc = _svc()
     g = await svc.create_game(owner_id=1, opponent_level="master", human_color="white")
@@ -299,6 +273,35 @@ async def test_undo_no_engine_even_with_sparse_log():
     await svc._repo.create(g)
     g2 = await svc.undo("g", user_id=1)  # откат чёрного: len4 → new_moves len2 (чёрная позиция)
     assert g2.moves == [[7, 7], [8, 8]] and svc._adapter.calls == 0
+
+
+async def test_advance_engine_black_does_not_query_fouls():
+    from app.models.game import Game
+
+    svc = _svc()
+    svc._adapter.calls = 0
+    orig = svc._adapter.forbidden_points
+
+    async def counting(game_id, moves, *, level_tag="-"):
+        svc._adapter.calls += 1
+        return await orig(game_id, moves, level_tag=level_tag)
+
+    svc._adapter.forbidden_points = counting
+    g = Game(
+        id="g",
+        owner_id=1,
+        moves=[[7, 7], [8, 8]],
+        undo_count=0,
+        forbidden_log={},
+        controllers={
+            "black": {"kind": "engine", "level_id": "master"},
+            "white": {"kind": "user", "user_id": 1},
+        },
+        status="opponent_thinking",
+    )
+    await svc._repo.create(g)
+    await svc.advance(g)  # движок-чёрный ходит 3-м; фолы для него НЕ запрашиваются
+    assert svc._adapter.calls == 0
 
 
 async def test_eve_advance_drives_both_engine_sides():

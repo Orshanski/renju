@@ -1,5 +1,5 @@
 async def test_create_and_move_live_engine(app, client, games_api, rapfi_paths):
-    # app поднял живой RapfiAdapter в lifespan — НЕ подменяем (rapfi_paths скипает без бинаря)
+    # app поднял живой EngineRegistry в lifespan — НЕ подменяем (rapfi_paths скипает без бинаря)
     await games_api.seed_login(app, client)
     gid = (
         await client.post("/api/games", json={"opponent": {"kind": "engine", "levelId": "novice"}})
