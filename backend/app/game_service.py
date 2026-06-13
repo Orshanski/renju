@@ -10,7 +10,6 @@ from .domain.game import validate_move
 from .domain.opening import CENTER, opening_zone
 from .domain.rules import outcome_after
 from .domain.values import MoveRejected, MoveRejectReason, Point
-from .rapfi.adapter import RapfiAdapter
 
 
 def new_game() -> list[Point]:
@@ -27,8 +26,13 @@ def apply_move(moves: Sequence[Point], point: Point, *, forbidden: Sequence[Poin
     return [*moves, point]
 
 
-async def engine_move(adapter: RapfiAdapter, moves: Sequence[Point], params: EngineParams) -> Point:
+async def engine_move(
+    adapter, moves: Sequence[Point], params: EngineParams, game_id: str, level_tag: str = "-"
+) -> Point:
     """Ход движка для позиции; дебютное обуздание спрятано. Инвариант: moves
-    непуст (центр предзаполнен new_game), поэтому allowed_zone не бывает синглтоном."""
+    непуст (центр предзаполнен new_game), поэтому allowed_zone не бывает синглтоном.
+    game_id — ПЕРВЫЙ позиционный у adapter (см. EngineRegistry.compute_move)."""
     zone = opening_zone(len(moves))
-    return await adapter.compute_move(moves, params, allowed_zone=zone)
+    return await adapter.compute_move(
+        game_id, moves, params, allowed_zone=zone, level_tag=level_tag
+    )

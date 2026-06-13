@@ -8,10 +8,10 @@ class FakeAdapter:
         self.forbid = [(3, 3)]
         self.move = (8, 8)
 
-    async def forbidden_points(self, moves):
+    async def forbidden_points(self, game_id, moves, *, level_tag="-"):
         return list(self.forbid)
 
-    async def compute_move(self, moves, params, allowed_zone=None):
+    async def compute_move(self, game_id, moves, params, allowed_zone=None, *, level_tag="-"):
         return self.move
 
 
@@ -29,9 +29,9 @@ async def test_fouls_memoized_one_engine_call():
     svc._adapter.calls = 0
     orig = svc._adapter.forbidden_points
 
-    async def counting(moves):
+    async def counting(game_id, moves, *, level_tag="-"):
         svc._adapter.calls += 1
-        return await orig(moves)
+        return await orig(game_id, moves, level_tag=level_tag)
 
     svc._adapter.forbidden_points = counting
     from app.models.game import Game
@@ -115,7 +115,7 @@ async def test_advance_engine_error_publishes_error_event():
 
     svc = _svc()
 
-    async def boom(moves, params, allowed_zone=None):
+    async def boom(game_id, moves, params, allowed_zone=None, *, level_tag="-"):
         raise EngineError("twice")
 
     svc._adapter.compute_move = boom
@@ -210,9 +210,9 @@ async def test_undo_pure_replay_no_engine():
     svc._adapter.calls = 0
     orig = svc._adapter.forbidden_points
 
-    async def counting(m):
+    async def counting(game_id, m):
         svc._adapter.calls += 1
-        return await orig(m)
+        return await orig(game_id, m)
 
     svc._adapter.forbidden_points = counting
     g = await svc.undo(g.id, user_id=1)
@@ -279,9 +279,9 @@ async def test_undo_no_engine_even_with_sparse_log():
     svc._adapter.calls = 0
     orig = svc._adapter.forbidden_points
 
-    async def counting(m):
+    async def counting(game_id, m):
         svc._adapter.calls += 1
-        return await orig(m)
+        return await orig(game_id, m)
 
     svc._adapter.forbidden_points = counting
     g = Game(
@@ -311,10 +311,10 @@ async def test_eve_advance_drives_both_engine_sides():
         def __init__(self):
             self.i = 0
 
-        async def forbidden_points(self, moves):
+        async def forbidden_points(self, game_id, moves, *, level_tag="-"):
             return []
 
-        async def compute_move(self, moves, params, allowed_zone=None):
+        async def compute_move(self, game_id, moves, params, allowed_zone=None, *, level_tag="-"):
             mv = seq[self.i]
             self.i += 1
             return mv

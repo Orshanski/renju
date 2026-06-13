@@ -22,7 +22,7 @@ from app.domain.values import (
 )
 from app.game_service import apply_move, engine_move, new_game
 from app.levels_config import LevelInfo, load_levels, resolve_level
-from app.rapfi.adapter import RapfiAdapter
+from app.rapfi.registry import EngineRegistry
 
 _COLS = string.ascii_lowercase[:BOARD_SIZE]  # a..o
 
@@ -59,10 +59,12 @@ def render_board(
 
 async def game_loop(level: LevelInfo) -> None:
     settings = Settings()
-    adapter = RapfiAdapter(
+    adapter = EngineRegistry(
         bin_path=settings.resolved_rapfi_bin(),
         config_path=settings.rapfi_config,
         cwd=REPO_ROOT,
+        idle_timeout_s=600.0,
+        kill_grace_s=settings.engine_kill_grace_s,
     )
     params = level.params
     human = random.choice([Color.BLACK, Color.WHITE])
@@ -71,14 +73,14 @@ async def game_loop(level: LevelInfo) -> None:
     moves: list[Point] = new_game()
     try:
         while True:
-            forbidden = await adapter.forbidden_points(moves)  # фолы чёрных; [] когда ход белых
+            forbidden = await adapter.forbidden_points("cli", moves)  # фолы чёрных
             human_turn = color_to_move(len(moves)) is human
             zone = opening_zone(len(moves)) if human_turn else None
             print(render_board(moves=moves, forbidden=forbidden, zone=zone))
 
             if not human_turn:
                 print("… соперник думает")
-                engine_pt = await engine_move(adapter, moves, params)
+                engine_pt = await engine_move(adapter, moves, params, "cli", level.id)
                 moves = apply_move(moves, engine_pt, forbidden=forbidden)
                 outcome = outcome_after(moves)
                 if outcome is not None:

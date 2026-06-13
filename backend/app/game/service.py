@@ -46,7 +46,7 @@ class GameService:
         if key in log:
             return [tuple(p) for p in log[key]]
         if color_to_move(len(moves)) is Color.BLACK:
-            pts = await self._adapter.forbidden_points(moves)
+            pts = await self._adapter.forbidden_points(game.id, moves, level_tag="-")
         else:
             pts = []
         game.forbidden_log = {**log, key: [list(p) for p in pts]}  # переприсвоить (JSON-mutation)
@@ -54,7 +54,7 @@ class GameService:
 
     def _players(self, game: Game) -> dict[Color, Player]:
         return {
-            Color(side): make_player(controller_from_json(c), self._adapter, self._levels)
+            Color(side): make_player(controller_from_json(c), self._adapter, self._levels, game.id)
             for side, c in game.controllers.items()
         }
 
