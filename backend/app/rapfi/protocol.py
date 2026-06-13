@@ -117,9 +117,15 @@ def takeback_commands(points: Sequence[Point]) -> list[str]:
     return [f"TAKEBACK {x},{y}" for x, y in points]
 
 
+def start_commands() -> list[str]:
+    """START + правило: создаёт доску движка и ставит рэндзю. Инварианты процесса —
+    шлются один раз на холодной синхронизации (свежий/респаун-процесс)."""
+    return [f"START {BOARD_SIZE}", "INFO rule 4"]
+
+
 def init_commands(params: EngineParams) -> list[str]:
-    """Холодная инициализация: START + правило + tunable."""
-    return [f"START {BOARD_SIZE}", "INFO rule 4", *tunable_commands(params)]
+    """Холодная инициализация хода: START + правило + per-move tunable."""
+    return [*start_commands(), *tunable_commands(params)]
 
 
 def position_commands(moves: Sequence[Point]) -> list[str]:

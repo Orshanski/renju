@@ -334,11 +334,12 @@ async def test_forbid_cold_when_synced_none():
         return p
 
     reg = make_registry(spawn)
-    await reg.forbidden_points("g", [(7, 7), (8, 8)])  # synced=None → cold YXBOARD без think
+    # synced=None → cold: START создаёт доску движка, затем YXBOARD+YXSHOWFORBID
+    await reg.forbidden_points("g", [(7, 7), (8, 8)])
     sent = [c for batch in procs[0].sent for c in batch]
-    assert "YXBOARD" in sent and "YXSHOWFORBID" in sent
-    assert "START 15" not in sent and not any(s.startswith("INFO strength") for s in sent)
-    assert reg._slots["g"].synced == [(7, 7), (8, 8)]  # cold-форбид без INFO
+    assert "START 15" in sent and "YXBOARD" in sent and "YXSHOWFORBID" in sent
+    assert not any(s.startswith("INFO strength") for s in sent)  # без tunable (форбид не думает)
+    assert reg._slots["g"].synced == [(7, 7), (8, 8)]
     await reg.close()
 
 

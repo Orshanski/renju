@@ -30,6 +30,7 @@ from .protocol import (
     forbid_commands,
     parse_line,
     plan_sync,
+    start_commands,
 )
 
 _log = logging.getLogger("renju.engine")
@@ -290,7 +291,9 @@ class EngineRegistry:
         if slot.proc is None or not slot.proc.alive:
             await self._respawn(slot, game_id, reason="dead")
         warm = slot.synced == target
-        cmds = ["YXSHOWFORBID"] if warm else forbid_commands(target)
+        # cold: START+правило создают доску движка (YXBOARD её требует — иначе
+        # "No game has been started"), затем YXBOARD(target)+YXSHOWFORBID без расчёта.
+        cmds = ["YXSHOWFORBID"] if warm else [*start_commands(), *forbid_commands(target)]
         proc = slot.proc
         assert proc is not None  # _respawn выставил slot.proc
         async with asyncio.timeout(timeout_s):

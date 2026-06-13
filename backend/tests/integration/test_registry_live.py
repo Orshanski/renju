@@ -198,37 +198,26 @@ async def test_compute_move_replies_to_human_move(rapfi_paths):
         await reg.close()
 
 
-async def test_forbidden_points_cold_double_three(rapfi_paths):
-    """Cold-запрос: движок распознаёт запрещённую точку (двойная тройка) на (7,7).
-
-    Движок должен быть прогрет (compute_move) перед YXBOARD — registry требует
-    активного сеанса (START уже был послан через compute_move).
-    """
+async def test_forbidden_points_cold_on_fresh_process(rapfi_paths):
+    """Cold-форбид на СВЕЖЕМ процессе (synced=None, без предшествующего compute_move):
+    _attempt_forbid сам шлёт START+правило (создают доску под YXBOARD), затем
+    YXBOARD+YXSHOWFORBID. Движок распознаёт запрещённую точку — двойную тройку на (7,7)."""
     # позиция проверена живым прогоном: двойная тройка чёрных в (7,7)
     moves = [(8, 7), (0, 0), (9, 7), (0, 2), (7, 8), (0, 4), (7, 9), (0, 6)]
     reg = _reg(rapfi_paths)
     try:
-        # прогрев: compute_move запускает START+INFO → после этого YXBOARD работает
-        await reg.compute_move("g", [(7, 7)], FAST)
-        # cold-запрос фолов: slot.synced != moves → _attempt_forbid шлёт YXBOARD+YXSHOWFORBID
-        forbidden = await reg.forbidden_points("g", moves)
+        forbidden = await reg.forbidden_points("g", moves)  # cold, без прогрева
         assert (7, 7) in forbidden
+        assert reg._slots["g"].synced == moves  # cold выставил synced
     finally:
         await reg.close()
 
 
-async def test_forbidden_points_empty_board(rapfi_paths):
-    """На пустой доске у чёрных нет запрещённых точек.
-
-    Движок прогрет через compute_move (START уже был); YXBOARD с пустым списком
-    возвращает FORBID без единой координаты.
-    """
+async def test_forbidden_points_empty_board_fresh(rapfi_paths):
+    """Пустая доска, свежий процесс: cold-форбид (START+YXBOARD пустой) → у чёрных фолов нет."""
     reg = _reg(rapfi_paths)
     try:
-        # прогрев: ensure START+INFO sent to engine
-        await reg.compute_move("g", [(7, 7)], FAST)
-        # cold-форбид на пустой доске: moves=[] → ход чёрных → engine вернёт FORBID
-        assert await reg.forbidden_points("g", []) == []
+        assert await reg.forbidden_points("g", []) == []  # cold на свежем процессе
     finally:
         await reg.close()
 
