@@ -102,6 +102,17 @@ def _engine_level_id(controllers: dict) -> str | None:
     return None
 
 
+def _loaded(game, attr: str):
+    """Значение атрибута БЕЗ неявного async-lazy-load: server-onupdate колонка
+    (updated_at) после commit помечена expired, а её чтение в sync-проперти дёрнуло бы
+    DB-round-trip (MissingGreenlet). На горячем пути refresh нам не нужен — для summary
+    хватит того, что уже в identity map; expired → None (значение косметическое)."""
+    from sqlalchemy import inspect as _inspect
+
+    state = _inspect(game)
+    return getattr(game, attr) if attr not in state.unloaded else None
+
+
 def _summary(game, user_id: int) -> GameSummaryDTO:
     return GameSummaryDTO(
         id=game.id,
@@ -111,7 +122,7 @@ def _summary(game, user_id: int) -> GameSummaryDTO:
         your_color=_your_color(game.controllers, user_id),
         move_count=len(game.moves),
         favorite=game.favorite,
-        updated_at=game.updated_at,
+        updated_at=_loaded(game, "updated_at"),
         finished_at=game.finished_at,
     )
 

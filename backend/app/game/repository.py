@@ -36,7 +36,6 @@ class SqlGameRepository:
 
     async def update(self, game: Game) -> None:
         await self._s.commit()  # game уже tracked сессией; коммитим изменения
-        await self._s.refresh(game)  # возвращаем server-onupdate поля (updated_at)
 
     async def delete(self, game_id: str) -> None:
         obj = await self._s.get(Game, game_id)
