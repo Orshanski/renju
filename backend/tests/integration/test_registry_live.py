@@ -1,4 +1,11 @@
+import asyncio
+from pathlib import Path
+
+import pytest
+
 from app.domain.engine_params import EngineParams
+from app.domain.values import BOARD_SIZE
+from app.rapfi.adapter import EngineError
 from app.rapfi.protocol import plan_sync
 from app.rapfi.registry import EngineRegistry
 
@@ -133,10 +140,13 @@ async def test_warm_forbid_no_reset(rapfi_paths):
     # 7 ходов (нечётное) → движок ходит белым (8-й) → synced из 8 элементов (чётное)
     # → forbidden_points не блокируется по гейту len(moves) % 2 != 0
     dbl3_moves = [
-        (5, 7), (0, 1),  # B W
-        (6, 7), (0, 2),  # B W
-        (7, 5), (0, 3),  # B W
-        (7, 6),          # B (7-й ход, чёрный)
+        (5, 7),
+        (0, 1),  # B W
+        (6, 7),
+        (0, 2),  # B W
+        (7, 5),
+        (0, 3),  # B W
+        (7, 6),  # B (7-й ход, чёрный)
     ]
     reg = _reg(rapfi_paths)
     try:
@@ -152,5 +162,185 @@ async def test_warm_forbid_no_reset(rapfi_paths):
         assert (7, 7) in fb, f"(7,7) должна быть запрещена (двойная тройка), получили: {fb}"
         assert reg._slots["g"].synced == synced_before, "warm-форбид сбросил synced"
         assert reg._slots["g"].pid == pid_before, "pid сменился после warm-форбида"
+    finally:
+        await reg.close()
+
+
+# ---------------------------------------------------------------------------
+# Перенесено из test_adapter.py: engine-контракт-тесты на EngineRegistry
+# ---------------------------------------------------------------------------
+
+FAST = EngineParams(strength=100, timeout_turn_ms=1000)
+
+
+def _on_board(p: tuple[int, int]) -> bool:
+    return 0 <= p[0] < BOARD_SIZE and 0 <= p[1] < BOARD_SIZE
+
+
+async def test_compute_move_on_empty_board(rapfi_paths):
+    """Движок отвечает легальным ходом на пустой доске (cold-запрос)."""
+    reg = _reg(rapfi_paths)
+    try:
+        move = await reg.compute_move("g", [], FAST)
+        assert _on_board(move)
+    finally:
+        await reg.close()
+
+
+async def test_compute_move_replies_to_human_move(rapfi_paths):
+    """Движок отвечает на первый ход человека — не в занятую клетку."""
+    reg = _reg(rapfi_paths)
+    try:
+        move = await reg.compute_move("g", [(7, 7)], FAST)
+        assert _on_board(move)
+        assert move != (7, 7)
+    finally:
+        await reg.close()
+
+
+async def test_forbidden_points_cold_double_three(rapfi_paths):
+    """Cold-запрос: движок распознаёт запрещённую точку (двойная тройка) на (7,7).
+
+    Движок должен быть прогрет (compute_move) перед YXBOARD — registry требует
+    активного сеанса (START уже был послан через compute_move).
+    """
+    # позиция проверена живым прогоном: двойная тройка чёрных в (7,7)
+    moves = [(8, 7), (0, 0), (9, 7), (0, 2), (7, 8), (0, 4), (7, 9), (0, 6)]
+    reg = _reg(rapfi_paths)
+    try:
+        # прогрев: compute_move запускает START+INFO → после этого YXBOARD работает
+        await reg.compute_move("g", [(7, 7)], FAST)
+        # cold-запрос фолов: slot.synced != moves → _attempt_forbid шлёт YXBOARD+YXSHOWFORBID
+        forbidden = await reg.forbidden_points("g", moves)
+        assert (7, 7) in forbidden
+    finally:
+        await reg.close()
+
+
+async def test_forbidden_points_empty_board(rapfi_paths):
+    """На пустой доске у чёрных нет запрещённых точек.
+
+    Движок прогрет через compute_move (START уже был); YXBOARD с пустым списком
+    возвращает FORBID без единой координаты.
+    """
+    reg = _reg(rapfi_paths)
+    try:
+        # прогрев: ensure START+INFO sent to engine
+        await reg.compute_move("g", [(7, 7)], FAST)
+        # cold-форбид на пустой доске: moves=[] → ход чёрных → engine вернёт FORBID
+        assert await reg.forbidden_points("g", []) == []
+    finally:
+        await reg.close()
+
+
+async def test_forbidden_points_white_to_move_is_empty(rapfi_paths):
+    """Нечётное число камней → ход белых → forbidden_points возвращает [] без запроса к движку."""
+    reg = _reg(rapfi_paths)
+    try:
+        assert await reg.forbidden_points("g", [(7, 7)]) == []
+    finally:
+        await reg.close()
+
+
+async def test_recovers_after_engine_crash(rapfi_paths):
+    """После внешнего краша процесса движок пересоздаётся и выдаёт легальный ход."""
+    reg = _reg(rapfi_paths)
+    try:
+        await reg.compute_move("g", [], FAST)
+        # имитируем внешний крах: завершаем процесс движка напрямую
+        slot = reg._slots["g"]
+        await slot.proc.terminate(grace_s=0.1)
+        # respawn + повтор должны произойти внутри следующего запроса
+        move = await reg.compute_move("g", [(7, 7)], FAST)
+        assert _on_board(move)
+    finally:
+        await reg.close()
+
+
+async def test_hanging_engine_killed_by_wall_clock(rapfi_paths):
+    """Зависший движок убивается по wall-clock и поднимает EngineError."""
+    _, config_path, cwd = rapfi_paths
+    hang = Path(__file__).parent / "fixtures" / "hang_engine.sh"
+    reg = EngineRegistry(
+        bin_path=hang,
+        config_path=config_path,
+        cwd=cwd,
+        idle_timeout_s=100,
+        wall_clock_slack_s=0.2,
+    )
+    try:
+        params = EngineParams(strength=100, timeout_turn_ms=200)
+        with pytest.raises(EngineError):
+            await reg.compute_move("g", [(7, 7)], params)
+    finally:
+        await reg.close()
+
+
+async def test_concurrent_requests_serialized(rapfi_paths):
+    """Два одновременных запроса (разные game_id) выполняются без ошибок."""
+    reg = _reg(rapfi_paths)
+    try:
+        moves = await asyncio.gather(
+            reg.compute_move("g1", [], FAST),
+            reg.compute_move("g2", [(7, 7)], FAST),
+        )
+        assert all(_on_board(m) for m in moves)
+    finally:
+        await reg.close()
+
+
+async def test_real_levels_work_end_to_end(rapfi_paths):
+    """Реальные параметры слабого уровня (strength=10) дают легальный ход."""
+    reg = _reg(rapfi_paths)
+    try:
+        move = await reg.compute_move(
+            "g", [(7, 7)], EngineParams(strength=10, timeout_turn_ms=1000)
+        )
+        assert _on_board(move)
+    finally:
+        await reg.close()
+
+
+async def test_compute_move_in_3x3_zone(rapfi_paths):
+    """Движок ходит внутри дебютной зоны 3×3 (opening_zone(1))."""
+    from app.domain.opening import opening_zone
+
+    reg = _reg(rapfi_paths)
+    try:
+        move = await reg.compute_move("g", [(7, 7)], FAST, allowed_zone=opening_zone(1))
+        assert move in opening_zone(1)
+        assert move != (7, 7)
+    finally:
+        await reg.close()
+
+
+async def test_compute_move_in_5x5_zone(rapfi_paths):
+    """Движок ходит внутри дебютной зоны 5×5 (opening_zone(2))."""
+    from app.domain.opening import opening_zone
+
+    reg = _reg(rapfi_paths)
+    try:
+        move = await reg.compute_move("g", [(7, 7), (8, 8)], FAST, allowed_zone=opening_zone(2))
+        assert move in opening_zone(2)
+        assert move not in {(7, 7), (8, 8)}
+    finally:
+        await reg.close()
+
+
+async def test_block_does_not_leak_to_next_request(rapfi_paths):
+    """После дебютного запроса с зоной следующий запрос БЕЗ зоны не ограничен 5×5.
+
+    far-кластер на левом крае (x=0): если бы YXBLOCK протёк — ход в кластере был бы
+    невозможен и compute_move упал бы. Ход x≤4 доказывает: блок снят корректно.
+    """
+    from app.domain.opening import opening_zone
+
+    reg = _reg(rapfi_paths)
+    try:
+        await reg.compute_move("g", [(7, 7), (8, 8)], FAST, allowed_zone=opening_zone(2))
+        far = [(0, 2), (0, 3), (0, 4), (0, 5), (0, 6)]  # кластер на левом крае
+        move = await reg.compute_move("g", far, FAST)  # без зоны
+        assert move not in set(far)
+        assert move not in opening_zone(2)
     finally:
         await reg.close()

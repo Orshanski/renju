@@ -58,4 +58,3 @@ def test_settings_auth_defaults(tmp_path, monkeypatch):
 def test_engine_registry_defaults():
     s = Settings()
     assert s.engine_idle_timeout_s > 0 and s.engine_sweep_interval_s > 0
-

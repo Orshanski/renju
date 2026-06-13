@@ -27,8 +27,6 @@ Backend (Python 3.13 / uv), из `backend/`:
 - `uv run pytest -q` — все тесты (unit + integration против живого движка, ~6с).
 - `uv run pytest tests/unit/test_rules.py::test_black_five_horizontal_wins -v` — один тест.
 - `uv run ruff check app tests scripts` · `uv run ruff format app tests scripts` — линт/формат.
-- `uv run python -m scripts.play_cli --level novice` — консольная партия против движка
-  (ручной smoke; уровни novice…master; ход `h8`, `u` undo, `q` выход).
 - **pytest гонять последовательно, не параллельно** — shared state (один процесс Rapfi).
 
 Движок Rapfi (вне git):
@@ -42,9 +40,10 @@ Backend (Python 3.13 / uv), из `backend/`:
   уровни, дебютные зоны). НЕ импортирует `app.rapfi`/`app.config`. Тестируется юнитами.
 - `app/rapfi/` — **адаптер движка**, роли разделены по файлам: `protocol.py` (pure:
   сборка команд + парсинг строк), `process.py` (OS-процесс на asyncio, без логики
-  протокола), `adapter.py` (фасад `compute_move`/`forbidden_points`: владеет процессом,
-  `asyncio.Lock` лимит расчётов=1, переинициализация на каждый запрос, wall-clock kill
-  + respawn + retry-once).
+  протокола), `adapter.py` (хелперы: `EngineError`, `_move_commands`,
+  `incremental_move_commands`, `_zone_block`, константы), `registry.py` (реестр
+  процессов по game_id: `EngineRegistry`, wall-clock kill + respawn + retry-once,
+  инкрементальный TAKEBACK/TURN путь).
 - `app/config.py` — настройки (pydantic-settings, env `RENJU_*`).
 - HTTP/FastAPI, БД/SQLite+Alembic, SSE, фронт/PWA — этапы 2–4 (ещё нет).
 
