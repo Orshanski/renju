@@ -26,6 +26,19 @@ async def test_inmemory_crud():
     assert [g.id for g in await repo.list_by_owner(1)] == ["g1"]
 
 
+async def test_inmemory_delete():
+    repo = InMemoryGameRepository()
+    await repo.create(_game())
+    await repo.delete("g1")
+    assert await repo.get("g1") is None
+
+
+async def test_inmemory_delete_idempotent():
+    repo = InMemoryGameRepository()
+    # удаление несуществующей партии не падает
+    await repo.delete("nonexistent")
+
+
 async def test_sql_crud(session, engine):
     # users-строка нужна под FK; берём реальный id (не полагаемся на autoincrement=1)
     from app.dal import users as udal
@@ -46,3 +59,27 @@ async def test_sql_crud(session, engine):
     async with make_sessionmaker(engine)() as s2:
         reread = await SqlGameRepository(s2).get("g1")
     assert reread is not None and reread.status == "finished_draw"
+
+
+async def test_sql_delete(session, engine):
+    from app.dal import users as udal
+    from app.db.session import make_sessionmaker
+
+    uid = await udal.create_user(session, "alice_del", "pw")
+    await session.commit()
+    repo = SqlGameRepository(session)
+    await repo.create(_game("gdel", owner=uid))
+    await repo.delete("gdel")
+    async with make_sessionmaker(engine)() as s2:
+        gone = await SqlGameRepository(s2).get("gdel")
+    assert gone is None
+
+
+async def test_sql_delete_idempotent(session):
+    from app.dal import users as udal
+
+    await udal.create_user(session, "alice_del2", "pw")
+    await session.commit()
+    repo = SqlGameRepository(session)
+    # удаление несуществующей партии не падает
+    await repo.delete("no-such-game")
