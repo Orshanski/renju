@@ -42,15 +42,14 @@ class InMemorySettingsRepository:
         self._d: dict[int, UserSettings] = {}
 
     async def get_or_default(self, user_id: int) -> UserSettings:
-        return self._d.get(
-            user_id,
-            UserSettings(
-                user_id=user_id,
-                current_limit=DEFAULT_CURRENT_LIMIT,
-                current_limit_enabled=True,
-                finished_limit=DEFAULT_FINISHED_LIMIT,
-                finished_limit_enabled=True,
-            ),
+        if user_id in self._d:
+            return self._d[user_id]
+        return UserSettings(
+            user_id=user_id,
+            current_limit=DEFAULT_CURRENT_LIMIT,
+            current_limit_enabled=True,
+            finished_limit=DEFAULT_FINISHED_LIMIT,
+            finished_limit_enabled=True,
         )
 
     async def upsert(self, settings: UserSettings) -> None:
