@@ -29,6 +29,7 @@ async def engine(tmp_path, monkeypatch) -> AsyncIterator[AsyncEngine]:
     monkeypatch.setenv("RENJU_DATA_DIR", str(tmp_path))
     import app.models.game  # noqa: F401
     import app.models.user  # noqa: F401 — регистрирует таблицу в metadata
+    import app.models.user_settings  # noqa: F401
     from app.config import Settings
     from app.db.base import Base
     from app.db.engine import make_engine
@@ -54,6 +55,7 @@ async def app(tmp_path, monkeypatch):
     monkeypatch.setenv("RENJU_DATA_DIR", str(tmp_path))
     import app.models.game  # noqa: F401
     import app.models.user  # noqa: F401
+    import app.models.user_settings  # noqa: F401
     from app.app_factory import create_app
     from app.config import Settings
     from app.db.base import Base

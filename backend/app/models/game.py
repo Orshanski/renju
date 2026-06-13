@@ -16,6 +16,8 @@ class Game(Base):
     status: Mapped[str]
     undo_count: Mapped[int] = mapped_column(default=0)
     forbidden_log: Mapped[dict] = mapped_column(JSON, default=dict)  # {str(len): [[x,y]…]}
+    favorite: Mapped[bool] = mapped_column(default=False)
+    finished_at: Mapped[datetime | None] = mapped_column(default=None)
     created_at: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
     updated_at: Mapped[datetime] = mapped_column(
         server_default=func.current_timestamp(), onupdate=func.current_timestamp()
