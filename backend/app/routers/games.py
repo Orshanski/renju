@@ -12,12 +12,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..auth import CurrentUser, decode_token, fetch_token_epoch, get_current_user
 from ..db.deps import get_session
 from ..domain.rules import winning_line
-from ..domain.values import GameStatus
+from ..domain.values import GameStatus, MoveRejected, UndoRejected
 from ..exceptions import BadInputError
 from ..game.dtos import CreateGameBody, LevelDTO
 from ..game.repository import SqlGameRepository
 from ..game.service import GameService
 from ..levels_config import resolve_level
+from ..logging_utils import safe
 from .auth import current_user
 
 logger = logging.getLogger("renju.games")
@@ -175,7 +176,17 @@ async def move(
     user: Annotated[CurrentUser, Depends(current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ):
-    game = await _service(request, session).submit_move(game_id, user.user_id, (body.x, body.y))
+    try:
+        game = await _service(request, session).submit_move(game_id, user.user_id, (body.x, body.y))
+    except MoveRejected as e:
+        logger.warning(
+            "move rejected: game=%s user=%s point=%s reason=%s",
+            safe(game_id),
+            user.user_id,
+            safe((body.x, body.y)),
+            safe(e.reason.value),
+        )
+        raise
     if game.status == GameStatus.OPPONENT_THINKING.value:  # ход соперника-движка — в фоне
         schedule_advance(request.app, game_id)
     return {"accepted": True}  # 202: ход принят; ответ соперника придёт SSE-событием
@@ -188,7 +199,16 @@ async def undo(
     user: Annotated[CurrentUser, Depends(current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ):
-    game = await _service(request, session).undo(game_id, user.user_id)
+    try:
+        game = await _service(request, session).undo(game_id, user.user_id)
+    except UndoRejected as e:
+        logger.warning(
+            "undo rejected: game=%s user=%s reason=%s",
+            safe(game_id),
+            user.user_id,
+            safe(e.reason.value),
+        )
+        raise
     return _state(game, user.user_id, request.app.state.event_hub)
 
 

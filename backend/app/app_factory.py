@@ -1,4 +1,6 @@
 import asyncio
+import logging
+import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -18,6 +20,13 @@ from .routers import games as games_router
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
 
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        stream=sys.stdout,
+    )
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         from .config import REPO_ROOT
@@ -36,8 +45,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 kill_grace_s=settings.engine_kill_grace_s,
             )
         except FileNotFoundError:
-            import logging
-
             logging.getLogger("renju").warning("Rapfi bin не собран — adapter=None")
             app.state.adapter = None
         app.state.event_hub = InMemoryEventHub()
