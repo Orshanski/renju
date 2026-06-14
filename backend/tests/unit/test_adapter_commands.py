@@ -37,7 +37,29 @@ def test_incremental_no_zone_takeback_then_turn():
     cmds = incremental_move_commands(
         plan, target=[(7, 7), (9, 9)], params=P_INCR, allowed_zone=None
     )
-    assert cmds == ["TAKEBACK 8,8", "INFO strength 5", "INFO timeout_turn 1000", "TURN 9,9"]
+    # YXHASHCLEAR после отката и ДО хода: снятый камень оставляет в TT стухшие
+    # линии, иначе движок на возвращённой позиции отвечает не как на свежей.
+    assert cmds == [
+        "TAKEBACK 8,8",
+        "YXHASHCLEAR",
+        "INFO strength 5",
+        "INFO timeout_turn 1000",
+        "TURN 9,9",
+    ]
+
+
+def test_incremental_no_turn_uses_yxnbest_on_current_board():
+    plan = SyncPlan(cold=False, takebacks=((5, 5), (6, 6), (8, 8)), turn=None)
+    cmds = incremental_move_commands(plan, target=[(7, 7)], params=P_INCR, allowed_zone=None)
+    assert cmds == [
+        "TAKEBACK 5,5",
+        "TAKEBACK 6,6",
+        "TAKEBACK 8,8",
+        "YXHASHCLEAR",
+        "INFO strength 5",
+        "INFO timeout_turn 1000",
+        "YXNBEST 1",
+    ]
 
 
 def test_incremental_with_zone_wraps_turn():
@@ -47,6 +69,7 @@ def test_incremental_with_zone_wraps_turn():
         plan, target=target, params=P_INCR, allowed_zone=opening_zone(2)
     )
     assert cmds[0] == "INFO strength 5"
+    assert "YXHASHCLEAR" not in cmds  # ход вперёд без отката — тёплую TT не чистим
     assert cmds.count("YXBLOCK") == 1 and cmds[-1] == "YXBLOCKRESET"
     assert "TURN 8,8" in cmds
     block_idx = cmds.index("YXBLOCK")

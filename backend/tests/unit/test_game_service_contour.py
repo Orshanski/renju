@@ -8,12 +8,16 @@ class FakeAdapter:
     def __init__(self):
         self.forbid = [(3, 3)]
         self.move = (8, 8)
+        self.undo_syncs = []
 
     async def forbidden_points(self, game_id, moves, *, level_tag="-"):
         return list(self.forbid)
 
     async def compute_move(self, game_id, moves, params, allowed_zone=None, *, level_tag="-"):
         return self.move
+
+    async def sync_after_undo(self, game_id, moves, *, level_tag="-"):
+        self.undo_syncs.append((game_id, [tuple(m) for m in moves], level_tag))
 
 
 def _svc(adapter=None, settings_repo=None):
@@ -195,6 +199,7 @@ async def test_undo_pure_replay_no_engine():
     # откат белых: снимаем ход 3 (движок) и ход 2 (человек) → назад к [[7,7]]
     assert g.moves == [[7, 7]] and "2" not in g.forbidden_log and "3" not in g.forbidden_log
     assert svc._adapter.calls == 0  # undo без движка
+    assert svc._adapter.undo_syncs == [(g.id, [(7, 7)], "-")]
 
 
 async def test_advance_recovers_and_is_idempotent():

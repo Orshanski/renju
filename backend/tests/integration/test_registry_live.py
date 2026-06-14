@@ -317,19 +317,18 @@ async def test_compute_move_in_5x5_zone(rapfi_paths):
 
 
 async def test_block_does_not_leak_to_next_request(rapfi_paths):
-    """После дебютного запроса с зоной следующий запрос БЕЗ зоны не ограничен 5×5.
+    """После дебютного запроса с зоной следующий TURN БЕЗ зоны не ограничен 5×5.
 
-    far-кластер на левом крае (x=0): если бы YXBLOCK протёк — ход в кластере был бы
-    невозможен и compute_move упал бы. Ход x≤4 доказывает: блок снят корректно.
+    Раньше тест подсовывал в тот же game_id несвязанную позицию, что требовало
+    cold-reset живого процесса. Новый контракт: в живом процессе только TURN/TAKEBACK.
     """
     from app.domain.opening import opening_zone
 
     reg = _reg(rapfi_paths)
     try:
-        await reg.compute_move("g", [(7, 7), (8, 8)], FAST, allowed_zone=opening_zone(2))
-        far = [(0, 2), (0, 3), (0, 4), (0, 5), (0, 6)]  # кластер на левом крае
-        move = await reg.compute_move("g", far, FAST)  # без зоны
-        assert move not in set(far)
-        assert move not in opening_zone(2)
+        first = await reg.compute_move("g", [(7, 7), (8, 8)], FAST, allowed_zone=opening_zone(2))
+        target = [(7, 7), (8, 8), first, (0, 2)]  # следующий ход человека, уже вне дебюта
+        move = await reg.compute_move("g", target, FAST)  # без зоны, через TURN 0,2
+        assert move not in set(target)
     finally:
         await reg.close()

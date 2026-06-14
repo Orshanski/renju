@@ -1,8 +1,8 @@
 """Реестр процессов Rapfi по game_id (rj-899). Один процесс на партию, изоляция.
 
-Защита от kill во время расчёта/при наличии зрителей — refcount'ы под одним
-registry_lock: `inflight` (идущие расчёты), `presence` (устройства). Оба инкрементятся
-в той же секции, что и выбор/создание слота → TOCTOU невозможен.
+Процесс живёт как матч в Piskvork-протоколе: инициализация один раз, дальше только
+штатные инкрементальные команды. `START`/`BOARD`/`YXBOARD` допустимы только пока
+`slot.synced is None`, то есть на свежем процессе.
 """
 
 import asyncio
@@ -28,9 +28,11 @@ from .protocol import (
     ParsedLine,
     ProtocolError,
     forbid_commands,
+    hashclear_commands,
     parse_line,
     plan_sync,
     start_commands,
+    takeback_commands,
 )
 
 _log = logging.getLogger("renju.engine")
@@ -106,7 +108,7 @@ class EngineRegistry:
         ms = int((self._now() - t0) * 1000)
         if parsed.move is None:
             _log.warning("engine_invalid_move game=%s pid=%s reason=no-move", game_id, slot.pid)
-            await self._reset_synced(slot)
+            await self._discard_slot(game_id, slot, "invalid")
             raise EngineError("engine returned no move")
         if parsed.move in set(target):
             _log.warning(
@@ -115,7 +117,7 @@ class EngineRegistry:
                 slot.pid,
                 parsed.move,
             )
-            await self._reset_synced(slot)
+            await self._discard_slot(game_id, slot, "invalid")
             raise EngineError(f"engine returned occupied cell: {parsed.move}")
         _log.info(
             "compute_move game=%s pid=%s moves=%d -> %s ms=%d",
@@ -148,6 +150,92 @@ class EngineRegistry:
             len(parsed.forbidden),
         )
         return list(parsed.forbidden)
+
+    async def sync_after_undo(
+        self, game_id: str, moves: Sequence[Point], *, level_tag: str = "-"
+    ) -> None:
+        """Undo-синхронизация живого процесса: только штатные TAKEBACK, без cold replay.
+
+        Если процесса/слота нет — синхронизировать нечего. Если живой slot уже не
+        сводится к target через снятие суффикса, slot считается испорченным и
+        выбрасывается, чтобы не продолжать партию из неверной позиции.
+        """
+        target: list[Point] = [(m[0], m[1]) for m in moves]
+        async with self._cond:
+            slot = self._slots.get(game_id)
+            if slot is None:
+                _log.info("undo_sync game=%s skipped=no-slot target=%s", game_id, target)
+                return
+            slot.inflight += 1
+            slot.last_activity = self._now()
+        try:
+            await slot.ready.wait()
+            async with slot.io_lock:
+                if slot.proc is None or not slot.proc.alive or slot.synced is None:
+                    _log.info(
+                        "undo_sync game=%s pid=%s skipped=not-ready target=%s synced=%s",
+                        game_id,
+                        slot.pid,
+                        target,
+                        slot.synced,
+                    )
+                    return
+                if len(target) > len(slot.synced) or slot.synced[: len(target)] != target:
+                    _log.warning(
+                        "undo_sync game=%s pid=%s reason=desync target=%s synced=%s",
+                        game_id,
+                        slot.pid,
+                        target,
+                        slot.synced,
+                    )
+                    await self._discard_slot(game_id, slot, "undo-desync")
+                    return
+                takebacks = tuple(reversed(slot.synced[len(target) :]))
+                if not takebacks:
+                    _log.info(
+                        "undo_sync game=%s pid=%s skipped=noop target=%s synced=%s",
+                        game_id,
+                        slot.pid,
+                        target,
+                        slot.synced,
+                    )
+                    return
+                proc = slot.proc
+                # YXHASHCLEAR ПОСЛЕ TAKEBACK: откат оставляет старый search/hash движка,
+                # иначе следующий расчёт на той же позиции отвечает не как на свежей.
+                cmds = [*takeback_commands(takebacks), *hashclear_commands()]
+                _log.info(
+                    "undo_sync game=%s pid=%s target=%s synced_before=%s cmds=%s",
+                    game_id,
+                    slot.pid,
+                    target,
+                    slot.synced,
+                    cmds,
+                )
+                try:
+                    async with asyncio.timeout(_FORBID_TIMEOUT_S):
+                        await proc.send(cmds)
+                        for _ in takebacks:
+                            await self._read_until(proc, LineKind.OK)
+                except (TimeoutError, EngineProcessDied, ProtocolError):
+                    _log.warning(
+                        "undo_sync game=%s pid=%s reason=failed target=%s synced_before=%s",
+                        game_id,
+                        slot.pid,
+                        target,
+                        slot.synced,
+                    )
+                    await self._discard_slot(game_id, slot, "undo-sync-failed")
+                    return
+                slot.synced = target
+                _log.info(
+                    "undo_sync game=%s pid=%s synced_after=%s",
+                    game_id,
+                    slot.pid,
+                    slot.synced,
+                )
+        finally:
+            await self._unclaim(slot, "inflight")
 
     async def mark_present(self, game_id: str, level_tag: str = "-") -> None:
         """enter: presence++ (spawn если первый)."""
@@ -287,20 +375,30 @@ class EngineRegistry:
     async def _attempt_forbid(
         self, slot: EngineSlot, game_id: str, target: list[Point], timeout_s: float
     ) -> ParsedLine:
-        """Один attempt: warm → YXSHOWFORBID; cold → YXBOARD+YXSHOWFORBID, затем synced=target."""
+        """Один attempt: свежий процесс → YXBOARD; живой процесс → TAKEBACK*+YXSHOWFORBID."""
         if slot.proc is None or not slot.proc.alive:
             await self._respawn(slot, game_id, reason="dead")
-        warm = slot.synced == target
-        # cold: START+правило создают доску движка (YXBOARD её требует — иначе
-        # "No game has been started"), затем YXBOARD(target)+YXSHOWFORBID без расчёта.
-        cmds = ["YXSHOWFORBID"] if warm else [*start_commands(), *forbid_commands(target)]
+        takebacks: tuple[Point, ...] | None = None
+        if slot.synced is not None:
+            n = 0
+            while n < len(slot.synced) and n < len(target) and slot.synced[n] == target[n]:
+                n += 1
+            if n == len(target):
+                takebacks = tuple(reversed(slot.synced[n:]))
+            else:
+                raise EngineError("engine state cannot be incrementally synced for forbidden")
+        cmds = (
+            [*takeback_commands(takebacks), "YXSHOWFORBID"]
+            if takebacks is not None
+            else [*start_commands(), *forbid_commands(target)]
+        )
         proc = slot.proc
         assert proc is not None  # _respawn выставил slot.proc
         async with asyncio.timeout(timeout_s):
             await proc.send(cmds)
             parsed = await self._read_until(proc, LineKind.FORBID)
-        if not warm:
-            slot.synced = target  # YXBOARD заменил доску на target (своего хода движок не делал)
+        if takebacks is not None or slot.synced != target:
+            slot.synced = target  # forbid-путь не делает ход движка, только приводит позицию
         return parsed
 
     async def _read_until(self, proc: _EngineProc, want: LineKind) -> ParsedLine:
@@ -352,6 +450,8 @@ class EngineRegistry:
         if slot.proc is None or not slot.proc.alive:
             await self._respawn(slot, game_id, reason="dead")  # сбросит synced=None
         plan = plan_sync(slot.synced, target)
+        if plan.cold and slot.synced is not None:
+            raise EngineError("engine state cannot be incrementally synced for move")
         if plan.cold:
             cmds = _move_commands(target, params, allowed_zone)
         else:
@@ -360,17 +460,27 @@ class EngineRegistry:
             )
         proc = slot.proc
         assert proc is not None  # _respawn выставил slot.proc
+        _log.info(
+            "engine_cmd game=%s pid=%s target=%s synced_before=%s cmds=%s",
+            game_id,
+            slot.pid,
+            target,
+            slot.synced,
+            cmds,
+        )
         async with asyncio.timeout(timeout_s):
             await proc.send(cmds)
             parsed = await self._read_until(proc, LineKind.MOVE)
         assert parsed.move is not None  # _read_until(MOVE) гарантирует ход
         slot.synced = [*target, parsed.move]
+        _log.info(
+            "engine_cmd game=%s pid=%s move=%s synced_after=%s",
+            game_id,
+            slot.pid,
+            parsed.move,
+            slot.synced,
+        )
         return parsed
-
-    async def _reset_synced(self, slot: EngineSlot) -> None:
-        """Сброс synced под io_lock: следующий запрос пойдёт cold."""
-        async with slot.io_lock:
-            slot.synced = None
 
     async def _respawn(self, slot: EngineSlot, game_id: str, *, reason: str) -> None:
         if slot.proc is not None:  # лог смены pid (наблюдаемость respawn, §3.1/§7)
@@ -389,3 +499,11 @@ class EngineRegistry:
             await slot.proc.terminate(grace_s=self._grace)
             slot.proc = None
             _log.info("kill game=%s pid=%s reason=%s", game_id, pid, reason)
+
+    async def _discard_slot(self, game_id: str, slot: EngineSlot, reason: str) -> None:
+        """Убрать испорченный slot из реестра и завершить его процесс."""
+        async with self._cond:
+            if self._slots.get(game_id) is slot:
+                self._slots.pop(game_id, None)
+                self._cond.notify_all()
+        await self._terminate(slot, game_id, reason)

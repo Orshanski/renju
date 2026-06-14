@@ -10,9 +10,11 @@ from ..domain.values import BOARD_SIZE, Point
 from .protocol import (
     SyncPlan,
     block_commands,
+    hashclear_commands,
     init_commands,
     position_commands,
     takeback_commands,
+    think_commands,
     tunable_commands,
     turn_commands,
 )
@@ -68,16 +70,26 @@ def incremental_move_commands(
     params: EngineParams,
     allowed_zone: frozenset[Point] | None,
 ) -> list[str]:
-    """Тёплый ход: TAKEBACK(хвост) → per-move INFO → [YXBLOCK]→TURN→[YXBLOCKRESET].
+    """Тёплый ход: TAKEBACK(хвост) → [YXHASHCLEAR] → per-move INFO → [YXBLOCK]→TURN/YXNBEST→[RESET].
 
-    Зона берётся от target (клетка хода человека ∈ target → не блокируется)."""
-    assert not plan.cold and plan.turn is not None
+    `TURN` используется, когда есть новый ход человека; `YXNBEST 1` — когда после
+    TAKEBACK нужно думать на уже текущей доске.
+
+    YXHASHCLEAR — ТОЛЬКО когда был откат (plan.takebacks непуст): снятый суффикс
+    оставляет в транспозиционной таблице (TT) записи от уже несуществующих линий, и
+    движок на возвращённой позиции отвечает не как на свежей (проверено прогоном
+    живого движка: TAKEBACK→TURN даёт стухший ход, TAKEBACK→YXHASHCLEAR→TURN — тот
+    же ход, что START+BOARD на этой позиции). На обычном ходе вперёд (без отката)
+    тёплая TT полезна — её НЕ чистим. clearHash чистит только TT, не историю, но
+    эмпирически для нашего бюджета этого достаточно."""
+    assert not plan.cold
     block = _zone_block(target, allowed_zone)
     cmds = [
         *takeback_commands(plan.takebacks),
+        *(hashclear_commands() if plan.takebacks else []),
         *tunable_commands(params),
         *block,
-        *turn_commands(plan.turn),
+        *(turn_commands(plan.turn) if plan.turn is not None else think_commands()),
     ]
     if block:
         cmds.append("YXBLOCKRESET")

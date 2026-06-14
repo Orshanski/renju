@@ -12,6 +12,7 @@ from app.rapfi.protocol import (
     plan_sync,
     position_commands,
     takeback_commands,
+    think_commands,
     tunable_commands,
     turn_commands,
 )
@@ -157,8 +158,10 @@ def test_plan_sync_undo_then_move_takes_back_to_prefix():
     assert plan_sync(synced, target) == expected
 
 
-def test_plan_sync_anomaly_tail_zero_is_cold():
-    assert plan_sync([(7, 7), (8, 8), (9, 9)], [(7, 7), (8, 8)]).cold
+def test_plan_sync_prefix_target_uses_takeback_and_think():
+    assert plan_sync([(7, 7), (8, 8), (9, 9)], [(7, 7), (8, 8)]) == SyncPlan(
+        cold=False, takebacks=((9, 9),), turn=None
+    )
 
 
 def test_plan_sync_anomaly_tail_gt_one_is_cold():
@@ -174,6 +177,10 @@ def test_tunable_commands_per_move_info():
 
 def test_turn_command_format():
     assert turn_commands((8, 7)) == ["TURN 8,7"]
+
+
+def test_think_command_format():
+    assert think_commands() == ["YXNBEST 1"]
 
 
 def test_takeback_commands_format_and_order():
