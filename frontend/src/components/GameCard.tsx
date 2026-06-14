@@ -2,16 +2,18 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } f
 import { createPortal } from "react-dom";
 import type { GameSummaryDTO } from "../game/types";
 import { favoriteGame, unfavoriteGame, deleteGame } from "../game/api";
-import { statusLabel, sectionDateLabel } from "../game/format";
+import { statusLabel, statusTone, sectionDateLabel } from "../game/format";
+import { MiniBoard } from "./MiniBoard";
 import styles from "./GameCard.module.css";
 
-type Props = { game: GameSummaryDTO; onOpen: (id: string) => void; onChanged: () => void };
+// levelName — человекочитаемое имя уровня (резолвит родитель по level_id; сводка несёт только id).
+type Props = { game: GameSummaryDTO; levelName?: string; onOpen: (id: string) => void; onChanged: () => void };
 
 const LONG_TAP_MS = 500;
 const MENU_W = 184;
 const MENU_H = 168; // оценка (min-width 160 + паддинги; ≤3 пункта)
 
-export function GameCard({ game, onOpen, onChanged }: Props) {
+export function GameCard({ game, levelName, onOpen, onChanged }: Props) {
   const [menu, setMenu] = useState(false);
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -89,13 +91,31 @@ export function GameCard({ game, onOpen, onChanged }: Props) {
       onPointerUp={cancelLongTap}
       onPointerMove={onPointerMove}
     >
-      <div className={styles.status}>{statusLabel(game.status, game.your_color)}</div>
-      <div className={styles.meta}>
-        {game.level_id && <span>{game.level_id}</span>}
-        <span>ход {game.move_count}</span>
-        {game.your_color && <span>ты {game.your_color === "black" ? "чёрные" : "белые"}</span>}
+      <div className={styles.thumb}><MiniBoard moves={game.moves} /></div>
+      <div className={styles.statusRow}>
+        <span className={`${styles.tag} ${styles[statusTone(game.status)]}`}>
+          {statusLabel(game.status, game.your_color)}
+        </span>
       </div>
-      <div className={styles.date}>{sectionDateLabel(game.section, game)}</div>
+      <div className={styles.meta}>
+        {game.your_color && (
+          <>
+            <span className={`${styles.chip} ${game.your_color === "black" ? styles.chipBlack : styles.chipWhite}`} />
+            <span>ты — {game.your_color === "black" ? "чёрные" : "белые"}</span>
+          </>
+        )}
+        {game.your_color && levelName && <span className={styles.dot} />}
+        {levelName && <span className={styles.levelPill}>{levelName}</span>}
+      </div>
+      <div className={styles.meta}>
+        <span>ход {game.move_count}</span>
+        {sectionDateLabel(game.section, game) && (
+          <>
+            <span className={styles.dot} />
+            <span>{sectionDateLabel(game.section, game)}</span>
+          </>
+        )}
+      </div>
 
       {menu && menuPos && createPortal(
         <>

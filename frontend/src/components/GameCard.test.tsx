@@ -7,8 +7,24 @@ import type { GameSummaryDTO } from "../game/types";
 
 const finished: GameSummaryDTO = {
   id: "g1", status: "finished_black", section: "finished", level_id: "master",
-  your_color: "black", move_count: 21, favorite: false, updated_at: null, finished_at: "2026-06-12T09:00:00",
+  your_color: "black", move_count: 3, moves: [[7, 7], [8, 8], [7, 8]],
+  favorite: false, updated_at: null, finished_at: "2026-06-12T09:00:00",
 };
+
+it("карточка показывает тег статуса, цвет/уровень и мини-доску с камнями", () => {
+  render(<GameCard game={finished} levelName="Мастер" onOpen={() => {}} onChanged={() => {}} />);
+  expect(screen.getByText("Победа")).toBeInTheDocument();
+  expect(screen.getByText(/чёрные/)).toBeInTheDocument();
+  expect(screen.getByText("Мастер")).toBeInTheDocument();
+  expect(screen.getAllByTestId("mini-stone")).toHaveLength(3);
+});
+
+it("карточка без твоего цвета (your_color=null): нет строки «ты — …», статус «Завершено»", () => {
+  const noColor: GameSummaryDTO = { ...finished, your_color: null, status: "finished_white" };
+  render(<GameCard game={noColor} onOpen={() => {}} onChanged={() => {}} />);
+  expect(screen.getByText("Завершено")).toBeInTheDocument();
+  expect(screen.queryByText(/ты —/)).toBeNull();
+});
 
 it("правый клик по завершённой → «В избранное» → POST favorite, зовёт onChanged", async () => {
   const onChanged = vi.fn();

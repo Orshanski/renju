@@ -48,5 +48,5 @@ it("отказ создания партии: кнопка снова актив
   );
   await userEvent.click(await screen.findByRole("button", { name: /Новичок/ }));
   expect(await screen.findByRole("button", { name: /Новичок/ })).toBeEnabled();
-  expect(screen.getByText("Выбери уровень")).toBeInTheDocument();
+  expect(screen.getByText("Выбери соперника")).toBeInTheDocument();
 });

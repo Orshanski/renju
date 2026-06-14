@@ -34,6 +34,7 @@ export type GameSummaryDTO = {
   level_id: string | null;
   your_color: Color | null;
   move_count: number;
+  moves: Point[]; // позиция для мини-доски карточки (rj-6ub)
   favorite: boolean;
   updated_at: string | null;
   finished_at: string | null;

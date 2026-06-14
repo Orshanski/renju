@@ -1,17 +1,9 @@
 import { pointLabel } from "../../game/legality";
+import { N, PAD, STEP, HOSHI, at } from "../../game/boardGeometry";
 import type { Color, Point } from "../../game/types";
 import styles from "./Board.module.css";
 
-// Геометрия гобана — пропорции прототипа (--step:38px, --pad:30px, бок 592px).
-// Все позиции в процентах от квадрата → доска fluid без JS (спека §«Геометрия»).
-const N = 15;
-const PAD = 30 / 592;
-const STEP = 38 / 592;
-const HOSHI: Point[] = [[3, 3], [11, 3], [3, 11], [11, 11], [7, 7]];
-
-const pos = (i: number) => `${(PAD + i * STEP) * 100}%`;
-const at = ([x, y]: Point) => ({ left: pos(x), top: pos(y) }); // инлайн — значения из данных (конвенция)
-
+// Геометрия гобана (N/PAD/STEP/HOSHI/at) — общий boardGeometry, percent-based fluid (спека §«Геометрия»).
 const CELLS: Point[] = [];
 for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) CELLS.push([x, y]);
 

@@ -9,6 +9,14 @@ export function statusLabel(status: GameStatus, your: Color | null): string {
   return your === winner ? "Победа" : "Поражение";
 }
 
+// Тон тега статуса на карточке (prototype/index.html §GAMES LIST .tag):
+// think — твой ход (киноварь), go — думает соперник (зелёный), done — завершена (серый).
+export function statusTone(status: GameStatus): "think" | "go" | "done" {
+  if (status === "awaiting_move") return "think";
+  if (status === "opponent_thinking") return "go";
+  return "done";
+}
+
 function fmt(iso: string): string {
   // Бэк сериализует datetime как naive UTC (без 'Z'/offset). Строка date-time без
   // обозначения пояса парсится движком JS как ЛОКАЛЬНОЕ время — метка сдвигалась на

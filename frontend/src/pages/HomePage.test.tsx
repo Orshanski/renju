@@ -8,7 +8,8 @@ import HomePage from "./HomePage";
 // HomePage сам EventSource не открывает (только GET /api/games/summary); FakeEventSource не нужен.
 function sum(id: string, section: string) {
   return { id, status: section === "current" ? "awaiting_move" : "finished_black", section,
-    level_id: "novice", your_color: "black", move_count: 2, favorite: section === "favorite",
+    level_id: "novice", your_color: "black", move_count: 2, moves: [[7, 7], [8, 8]],
+    favorite: section === "favorite",
     updated_at: "2026-06-13T10:00:00", finished_at: section === "current" ? null : "2026-06-12T09:00:00" };
 }
 

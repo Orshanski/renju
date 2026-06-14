@@ -110,6 +110,11 @@ def _summary(game, user_id: int) -> GameSummaryDTO:
         level_id=_engine_level_id(game.controllers),
         your_color=_your_color(game.controllers, user_id),
         move_count=len(game.moves),
+        # мини-доска карточки (rj-6ub); уже загружено для move_count. Без пагинации: список
+        # завершённых растёт со временем, а на партию приедет весь moves (≤225 точек). Осознанно
+        # ОК для self-hosted/свои (нет PvP, строки партий и так грузятся целиком); если раздел
+        # станет большим — пагинировать сводку или тянуть миниатюру лениво.
+        moves=game.moves,
         favorite=game.favorite,
         updated_at=game.updated_at,
         finished_at=game.finished_at,

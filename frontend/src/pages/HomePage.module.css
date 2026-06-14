@@ -1,14 +1,15 @@
-/* по prototype/index.html (eyebrow/sub); токены — @value (tokens.module.css) */
-@value sumiSoft, sumiFaint, vermillion, vermillionDeep, shadowSm, fontSerif, fontSans from "../styles/tokens.module.css";
+/* по prototype/index.html §GAMES LIST (.list-head); токены — @value (tokens.module.css) */
+@value sumi, sumiSoft, vermillion, vermillionDeep, shadowSm, fontSerif, fontSans from "../styles/tokens.module.css";
 
 .wrap { max-width: 1120px; margin: 0 auto; }
 
-/* шапка: eyebrow слева, кнопка «＋ Новая партия» справа */
+/* шапка: слева eyebrow + заголовок + подзаголовок, справа кнопка «＋ Новая партия» (низами в линию) */
 .head {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
-  margin-bottom: 16px;
+  gap: 20px;
+  margin-bottom: 30px;
 }
 
 .eyebrow {
@@ -24,6 +25,7 @@
 }
 .eyebrow::before { content: ""; width: 26px; height: 1px; background: vermillion; display: inline-block; }
 
+.title { font-family: fontSerif; font-weight: 800; font-size: 40px; line-height: 1.05; margin: 14px 0 6px; letter-spacing: -0.5px; }
 .sub { color: sumiSoft; font-size: 15px; font-weight: 300; }
 
 .newBtn {
@@ -39,41 +41,34 @@
   color: #fbeee6;
   box-shadow: shadowSm;
   transition: 0.18s;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .newBtn:hover { background: vermillionDeep; transform: translateY(-1px); }
 
-/* таб-бар */
+/* таб-бар разделов — по prototype/index.html §ADMIN (.admin-tabs): подчёркивание */
 .tabs {
   display: flex;
   gap: 4px;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid rgba(60, 45, 25, 0.16);
 }
 
-.tab {
-  font-family: fontSans;
-  font-size: 14px;
-  font-weight: 400;
-  color: sumiFaint;
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  padding: 8px 14px;
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
-}
-.tab:hover { color: sumiSoft; }
-
+.tab,
 .tabActive {
   font-family: fontSans;
   font-size: 14px;
-  font-weight: 600;
-  color: vermillion;
-  background: transparent;
+  background: none;
   border: none;
-  border-bottom: 2px solid vermillion;
-  padding: 8px 14px;
+  border-bottom: 2px solid transparent;
+  padding: 12px 18px;
+  margin-bottom: -1px;
   cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
 }
+.tab { color: sumiSoft; font-weight: 400; }
+.tab:hover { color: sumi; }
+.tabActive { color: sumi; font-weight: 500; border-bottom-color: vermillion; }
 
 /* сетка карточек */
 .grid {
