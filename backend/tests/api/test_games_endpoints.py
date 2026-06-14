@@ -216,7 +216,8 @@ async def test_unfavorite_game(app, client, games_api):
 
 
 async def test_summary_current_fields(app, client, games_api):
-    """GET /api/games/summary?section=current: лёгкий summary-DTO без тяжёлых полей."""
+    """GET /api/games/summary?section=current: summary-DTO с позицией (moves) для
+    мини-доски карточки, но без прочих тяжёлых полей (winning_line/cursor/forbidden)."""
     app.state.adapter = games_api.FakeAdapter()
     await games_api.seed_login(app, client)
 
@@ -239,6 +240,7 @@ async def test_summary_current_fields(app, client, games_api):
         "level_id",
         "your_color",
         "move_count",
+        "moves",
         "favorite",
         "updated_at",
         "finished_at",
@@ -248,8 +250,12 @@ async def test_summary_current_fields(app, client, games_api):
     # move_count — число (не массив)
     assert isinstance(item["move_count"], int)
 
-    # тяжёлые поля должны ОТСУТСТВОВАТЬ
-    assert "moves" not in item
+    # moves — позиция для мини-доски: список координат, согласован со счётчиком
+    assert isinstance(item["moves"], list)
+    assert len(item["moves"]) == item["move_count"]
+    assert all(isinstance(p, list) and len(p) == 2 for p in item["moves"])
+
+    # прочие тяжёлые поля по-прежнему ОТСУТСТВУЮТ
     assert "winning_line" not in item
     assert "cursor" not in item
     assert "forbidden" not in item

@@ -24,6 +24,7 @@ class GameSummaryDTO(BaseModel):
     level_id: str | None  # уровень engine-оппонента, None если нет engine-стороны
     your_color: str | None
     move_count: int
+    moves: list[list[int]]  # позиция для мини-доски карточки; уже в строке партии (rj-6ub)
     favorite: bool
     updated_at: datetime | None
     finished_at: datetime | None

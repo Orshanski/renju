@@ -110,6 +110,7 @@ def _summary(game, user_id: int) -> GameSummaryDTO:
         level_id=_engine_level_id(game.controllers),
         your_color=_your_color(game.controllers, user_id),
         move_count=len(game.moves),
+        moves=game.moves,  # мини-доска карточки (rj-6ub); уже загружено для move_count
         favorite=game.favorite,
         updated_at=game.updated_at,
         finished_at=game.finished_at,

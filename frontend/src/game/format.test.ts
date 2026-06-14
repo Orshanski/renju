@@ -1,5 +1,5 @@
 import { it, expect } from "vitest";
-import { statusLabel, sectionDateLabel } from "./format";
+import { statusLabel, statusTone, sectionDateLabel } from "./format";
 
 it("statusLabel: текущая — по твоему ходу; завершённая — по результату", () => {
   expect(statusLabel("awaiting_move", "black")).toBe("Твой ход");
@@ -10,6 +10,14 @@ it("statusLabel: текущая — по твоему ходу; завершён
   expect(statusLabel("finished_black", "white")).toBe("Поражение");
   expect(statusLabel("finished_black", null)).toBe("Завершено");
   expect(statusLabel("finished_draw", "black")).toBe("Ничья");
+});
+
+it("statusTone: твой ход→think, соперник→go, любая завершённая→done", () => {
+  expect(statusTone("awaiting_move")).toBe("think");
+  expect(statusTone("opponent_thinking")).toBe("go");
+  expect(statusTone("finished_black")).toBe("done");
+  expect(statusTone("finished_white")).toBe("done");
+  expect(statusTone("finished_draw")).toBe("done");
 });
 
 it("sectionDateLabel: текущая — обновлено(updated_at); завершённая/избранная — завершено(finished_at)", () => {

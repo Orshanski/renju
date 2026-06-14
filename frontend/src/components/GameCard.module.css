@@ -1,47 +1,62 @@
-/* Карточка партии с контекстным меню; токены — @value */
-@value sumiSoft, shadowSm, fontSerif, fontSans, washi, paper, sumi, sumiFaint from "../styles/tokens.module.css";
+/* Карточка партии — по prototype/index.html §GAMES LIST (.gcard и слои); токены — @value. */
+@value sumiSoft, sumiFaint, shadow, shadowSm, fontSerif, fontSans, washi, paper, sumi, vermillion, indigo, okGreen, r from "../styles/tokens.module.css";
 
 .card {
-  position: relative; /* якорь для .menu */
-  background: washi;
-  border-radius: 11px;
-  padding: 14px 16px;
+  position: relative; /* якорь для портала меню не нужен (fixed), но оставляем для слоёв */
+  background: linear-gradient(#f6eedd, #efe4cd);
+  border: 1px solid rgba(60, 45, 25, 0.14);
+  border-radius: r; /* 14px */
+  padding: 20px;
   box-shadow: shadowSm;
   cursor: pointer;
   font-family: fontSans;
   color: sumi;
-  transition: 0.15s;
+  transition: 0.2s;
   user-select: none;
   touch-action: manipulation;
   -webkit-touch-callout: none;
 }
-.card:hover { box-shadow: 0 8px 24px -10px rgba(40, 28, 14, 0.55); }
-
-.status {
-  font-family: fontSerif;
-  font-weight: 700;
-  font-size: 16px;
-  margin-bottom: 6px;
+.card:hover {
+  transform: translateY(-3px);
+  box-shadow: shadow;
+  border-color: rgba(60, 45, 25, 0.28);
 }
+
+.thumb { margin-bottom: 14px; }
+
+.statusRow { margin-bottom: 10px; }
+.tag {
+  display: inline-block;
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 4px 9px;
+  border-radius: 20px;
+  font-weight: 500;
+}
+.think { background: rgba(189, 51, 38, 0.14); color: vermillion; }
+.go { background: rgba(63, 122, 78, 0.16); color: okGreen; }
+.done { background: rgba(60, 45, 25, 0.1); color: sumiSoft; }
 
 .meta {
   display: flex;
-  gap: 10px;
+  align-items: center;
+  gap: 8px;
   font-size: 13px;
   color: sumiSoft;
-  margin-bottom: 4px;
+  margin-top: 6px;
 }
-
-.date {
-  font-size: 12px;
-  color: sumiFaint;
-}
+.dot { width: 5px; height: 5px; border-radius: 50%; background: sumiFaint; display: inline-block; flex-shrink: 0; }
+.chip { width: 18px; height: 18px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.chipBlack { background: radial-gradient(circle at 33% 28%, #56514b, #16130f); }
+.chipWhite { background: radial-gradient(circle at 33% 28%, #fdfbf6, #cfc8b8); box-shadow: inset 0 0 0 1px rgba(120, 100, 70, 0.3); }
+.levelPill { font-family: fontSerif; font-weight: 700; color: indigo; }
 
 .backdrop { position: fixed; inset: 0; z-index: 1000; } /* перехват клика вне меню → dismiss */
 
 .menu {
   position: fixed; /* координаты приходят инлайном через style; портал в body */
-  background: paper; /* светлая тёплая поверхность — отделяется от washi-карточки под ней */
+  background: paper; /* светлая тёплая поверхность — отделяется от карточки под ней */
   border-radius: 8px;
   box-shadow: shadowSm;
   overflow: hidden;

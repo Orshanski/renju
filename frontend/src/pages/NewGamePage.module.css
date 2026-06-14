@@ -1,14 +1,46 @@
-@value sumiSoft, vermillion, vermillionDeep, shadowSm, fontSerif, fontSans from "../styles/tokens.module.css";
+/* Экран новой партии — по prototype/index.html §MODAL (.levels/.lvl/.dice); токены — @value. */
+@value sumi, sumiSoft, vermillion, vermillionDeep, indigo, shadowSm, fontSerif, fontSans from "../styles/tokens.module.css";
 
 .wrap { max-width: 1120px; margin: 0 auto; }
 .eyebrow { font-family: fontSerif; font-weight: 600; letter-spacing: 5px; text-transform: uppercase; font-size: 11px; color: vermillion; display: flex; align-items: center; gap: 10px; }
 .eyebrow::before { content: ""; width: 26px; height: 1px; background: vermillion; display: inline-block; }
-.title { font-family: fontSerif; font-weight: 800; font-size: 40px; line-height: 1.05; margin: 14px 0 18px; letter-spacing: -0.5px; }
+.title { font-family: fontSerif; font-weight: 800; font-size: 40px; line-height: 1.05; margin: 14px 0 22px; letter-spacing: -0.5px; }
 .sub { color: sumiSoft; font-size: 15px; font-weight: 300; }
-.levels { display: flex; flex-wrap: wrap; gap: 12px; }
+
+/* плитки уровней — иероглиф-печать + название; два центрированных ряда (3 + 4 для 7 уровней) */
+.levels { display: flex; flex-direction: column; gap: 12px; max-width: 632px; }
+.levelRow { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
 .level {
-  font-family: fontSans; font-weight: 500; font-size: 15px; cursor: pointer; border: none; border-radius: 11px;
-  padding: 14px 22px; background: vermillion; color: #fbeee6; box-shadow: shadowSm; transition: 0.18s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 140px;
+  padding: 16px 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(60, 45, 25, 0.2);
+  background: #fbf6ea;
+  font-family: fontSans;
+  color: sumi;
+  cursor: pointer;
+  text-align: center;
+  transition: 0.16s;
 }
-.level:hover:enabled { background: vermillionDeep; transform: translateY(-1px); }
-.level:disabled { opacity: 0.6; cursor: default; }
+.level:hover:enabled { border-color: indigo; transform: translateY(-2px); box-shadow: shadowSm; }
+.level:disabled { opacity: 0.5; cursor: default; }
+.lk { font-family: fontSerif; font-size: 26px; font-weight: 700; line-height: 1; color: indigo; }
+.ln { font-size: 12px; letter-spacing: 0.3px; }
+
+.dice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 632px;
+  margin-top: 22px;
+  padding: 12px 14px;
+  border-radius: 11px;
+  background: rgba(189, 51, 38, 0.08);
+  border: 1px dashed rgba(189, 51, 38, 0.35);
+  color: vermillionDeep;
+  font-size: 13.5px;
+}

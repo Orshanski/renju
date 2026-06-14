@@ -1,0 +1,60 @@
+/* Миниатюра доски карточки — облегчённый слепок prototype/index.html §GAME (.goban),
+   сетка 14-делений как у настоящей доски (камни ложатся на пересечения). Токены — @value. */
+@value lineInk, vermillion from "../styles/tokens.module.css";
+
+.mini {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 9px;
+  overflow: hidden;
+  background:
+    linear-gradient(160deg, rgba(255, 250, 238, 0.1), rgba(214, 182, 134, 0.08)),
+    url("../assets/board_pine.webp");
+  background-size: cover;
+  background-position: center;
+  box-shadow: inset 0 0 0 1px rgba(120, 80, 40, 0.3);
+}
+.grid {
+  position: absolute;
+  left: 5.0676%;
+  top: 5.0676%;
+  width: calc(89.8648% + 1px); /* +1px замыкает последнюю линию (приём прототипа) */
+  height: calc(89.8648% + 1px);
+  background-image:
+    linear-gradient(lineInk 0.5px, transparent 0.5px),
+    linear-gradient(90deg, lineInk 0.5px, transparent 0.5px);
+  background-size: calc((100% - 1px) / 14) calc((100% - 1px) / 14);
+}
+.hoshi {
+  position: absolute;
+  width: 1.4%;
+  height: 1.4%;
+  border-radius: 50%;
+  background: rgba(40, 28, 14, 0.6);
+  transform: translate(-50%, -50%);
+}
+.stone {
+  position: absolute;
+  width: 5.4054%;
+  height: 5.4054%;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+.black {
+  background: radial-gradient(circle at 34% 28%, #5a554e 0%, #211d18 55%, #0d0b09 100%);
+  box-shadow: 0 1px 2px rgba(20, 12, 4, 0.5);
+}
+.white {
+  background: radial-gradient(circle at 34% 28%, #ffffff 0%, #f2ede1 50%, #cbc2af 100%);
+  box-shadow: 0 1px 2px rgba(20, 12, 4, 0.35), inset 0 0 0 0.5px rgba(120, 100, 70, 0.3);
+}
+.last {
+  position: absolute;
+  width: 1.8%;
+  height: 1.8%;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+.lastOnBlack { background: #e9dcc4; }
+.lastOnWhite { background: vermillion; }
