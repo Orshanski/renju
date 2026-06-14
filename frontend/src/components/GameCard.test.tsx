@@ -19,6 +19,13 @@ it("карточка показывает тег статуса, цвет/уро
   expect(screen.getAllByTestId("mini-stone")).toHaveLength(3);
 });
 
+it("карточка без твоего цвета (your_color=null): нет строки «ты — …», статус «Завершено»", () => {
+  const noColor: GameSummaryDTO = { ...finished, your_color: null, status: "finished_white" };
+  render(<GameCard game={noColor} onOpen={() => {}} onChanged={() => {}} />);
+  expect(screen.getByText("Завершено")).toBeInTheDocument();
+  expect(screen.queryByText(/ты —/)).toBeNull();
+});
+
 it("правый клик по завершённой → «В избранное» → POST favorite, зовёт onChanged", async () => {
   const onChanged = vi.fn();
   server.use(http.post("/api/games/g1/favorite", () => HttpResponse.json(true)));

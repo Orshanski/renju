@@ -41,8 +41,9 @@ export default function NewGamePage() {
 
   // Два центрированных ряда: короткий — сверху (floor(n/2)). Для 7 уровней → 3 + 4,
   // без одинокой плитки. Сплит data-driven — переживёт смену числа уровней в levels.toml.
+  // filter(length) убирает пустой ряд при n<2 (иначе лишний gap над единственной плиткой).
   const rows = levels
-    ? [levels.slice(0, Math.floor(levels.length / 2)), levels.slice(Math.floor(levels.length / 2))]
+    ? [levels.slice(0, Math.floor(levels.length / 2)), levels.slice(Math.floor(levels.length / 2))].filter((r) => r.length)
     : [];
 
   return (
