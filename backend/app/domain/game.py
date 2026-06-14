@@ -2,7 +2,6 @@
 
 from collections.abc import Sequence
 
-from .opening import opening_zone
 from .values import (
     BOARD_SIZE,
     Color,
@@ -11,29 +10,23 @@ from .values import (
     Point,
     UndoRejected,
     UndoRejectReason,
-    color_to_move,
 )
 
 
-def validate_move(
-    *,
-    moves: Sequence[Point],
-    point: Point,
-    forbidden: Sequence[Point],
-) -> None:
-    """Бросает MoveRejected, если ход недопустим ПО ПРАВИЛАМ (геометрия → занятость →
-    дебютная зона → фол). Статус партии и очередь — оркестрация, не здесь.
-    Сторона-на-ходу выводится из len(moves); роль (человек/ИИ) не нужна."""
+def validate_move(*, moves: Sequence[Point], point: Point) -> None:
+    """Бросает MoveRejected при нарушении ЦЕЛОСТНОСТИ хода: геометрия → занятость.
+
+    Дебютную зону и фолы НЕ сторожит: для человека их закрывает фронт (рисует только
+    разрешённые клетки + forbidden), движок их соблюдает сам (RULE 4). Серверный сторож
+    этих правил защищал бы от несуществующей угрозы (self-hosted, свои люди, нет PvP/
+    ставок — подделка хода вредит лишь самому игроку). Зона и фолы остаются ПОСТАВЩИКАМИ
+    ограничений фронту (opening_zone, GameService.fouls), а не сторожем. Завершённость —
+    оркестрация (apply_move), не здесь. Сторона-на-ходу из len(moves); роль не нужна."""
     x, y = point
     if not (0 <= x < BOARD_SIZE and 0 <= y < BOARD_SIZE):
         raise MoveRejected(MoveRejectReason.OUT_OF_BOARD)
     if point in set(moves):
         raise MoveRejected(MoveRejectReason.OCCUPIED)
-    zone = opening_zone(len(moves))
-    if zone is not None and point not in zone:
-        raise MoveRejected(MoveRejectReason.OPENING_VIOLATION)
-    if color_to_move(len(moves)) is Color.BLACK and point in set(forbidden):
-        raise MoveRejected(MoveRejectReason.FORBIDDEN)
 
 
 def undo_truncate(*, moves: Sequence[Point], for_color: Color, preset: int = 1) -> list[Point]:

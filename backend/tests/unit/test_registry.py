@@ -264,6 +264,103 @@ async def test_undo_path_takeback_to_prefix_then_turn():
 
 
 @pytest.mark.asyncio
+async def test_sync_after_undo_sends_takeback_and_updates_synced():
+    procs = []
+
+    async def spawn(**kw):
+        p = FakeProc(["8,8", "OK", "9,9"])
+        procs.append(p)
+        return p
+
+    reg = make_registry(spawn)
+    await reg.compute_move("g", [(7, 7)], P)
+    assert reg._slots["g"].synced == [(7, 7), (8, 8)]
+
+    procs[0].sent.clear()
+    await reg.sync_after_undo("g", [(7, 7)])
+
+    assert procs[0].sent == [["TAKEBACK 8,8", "YXHASHCLEAR"]]  # хеш чистим после отката
+    assert reg._slots["g"].synced == [(7, 7)]
+
+    await reg.compute_move("g", [(7, 7), (6, 6)], P)
+    sent = [c for batch in procs[0].sent for c in batch]
+    assert "START 15" not in sent
+    assert "TURN 6,6" in sent
+    assert reg._slots["g"].synced == [(7, 7), (6, 6), (9, 9)]
+    await reg.close()
+
+
+@pytest.mark.asyncio
+async def test_sync_after_undo_discards_slot_when_target_is_not_prefix():
+    procs = []
+
+    async def spawn(**kw):
+        p = FakeProc(["8,8"])
+        procs.append(p)
+        return p
+
+    reg = make_registry(spawn)
+    await reg.compute_move("g", [(7, 7)], P)
+    await reg.sync_after_undo("g", [(6, 6)])
+
+    assert "g" not in reg._slots
+    assert procs[0].alive is False
+    await reg.close()
+
+
+@pytest.mark.asyncio
+async def test_undo_to_first_move_then_engine_thinks_on_current_board():
+    procs = []
+
+    async def spawn(**kw):
+        p = FakeProc(["8,8", "9,9"])
+        procs.append(p)
+        return p
+
+    reg = make_registry(spawn)
+    await reg.compute_move("g", [(7, 7)], P)
+    procs[0].sent.clear()
+    await reg.compute_move("g", [(7, 7)], P)
+    sent = [c for batch in procs[0].sent for c in batch]
+    assert "START 15" not in sent and "BOARD" not in sent
+    # YXHASHCLEAR после TAKEBACK: откат оставляет в TT стухшие линии (см. probe).
+    assert sent == [
+        "TAKEBACK 8,8",
+        "YXHASHCLEAR",
+        "INFO strength 50",
+        "INFO timeout_turn 200",
+        "YXNBEST 1",
+    ]
+    assert reg._slots["g"].synced == [(7, 7), (9, 9)]
+    await reg.close()
+
+
+@pytest.mark.asyncio
+async def test_compute_move_anomaly_rejects_without_cold_resetting_live_process():
+    procs = []
+
+    async def spawn(**kw):
+        p = FakeProc(["8,8"])
+        procs.append(p)
+        return p
+
+    reg = make_registry(spawn)
+    await reg.compute_move("g", [(7, 7)], P)
+    procs[0].sent.clear()
+
+    from app.rapfi.adapter import EngineError
+
+    with pytest.raises(EngineError):
+        await reg.compute_move("g", [(7, 7), (8, 8), (6, 6), (5, 5)], P)
+
+    assert len(procs) == 1
+    assert procs[0].alive is True
+    assert procs[0].sent == []
+    assert reg._slots["g"].synced == [(7, 7), (8, 8)]
+    await reg.close()
+
+
+@pytest.mark.asyncio
 async def test_respawn_resets_synced_to_cold():
     # после смерти процесса следующий запрос идёт COLD (synced сброшен)
     procs = []
@@ -286,19 +383,24 @@ async def test_respawn_resets_synced_to_cold():
 
 
 @pytest.mark.asyncio
-async def test_post_lock_invalid_move_resets_synced():
-    # движок вернул ЗАНЯТУЮ клетку → EngineError, synced сброшен в None (следующий cold)
+async def test_post_lock_invalid_move_discards_slot():
+    # движок вернул ЗАНЯТУЮ клетку → EngineError, процесс испорчен и убит.
     import pytest as _pt
 
     from app.rapfi.adapter import EngineError
 
+    procs = []
+
     async def spawn(**kw):
-        return FakeProc(["7,7"])  # вернёт уже занятую (7,7)
+        p = FakeProc(["7,7"])  # вернёт уже занятую (7,7)
+        procs.append(p)
+        return p
 
     reg = make_registry(spawn)
     with _pt.raises(EngineError):
         await reg.compute_move("g", [(7, 7)], P)
-    assert reg._slots["g"].synced is None
+    assert "g" not in reg._slots
+    assert procs[0].alive is False
     await reg.close()
 
 
@@ -321,6 +423,55 @@ async def test_forbid_warm_only_yxshowforbid():
     sent = [c for batch in procs[0].sent for c in batch]
     assert sent == ["YXSHOWFORBID"]  # ни START, ни YXBOARD, ни INFO
     assert reg._slots["g"].synced == [(7, 7), (8, 8)]  # не тронут (read-only)
+    await reg.close()
+
+
+@pytest.mark.asyncio
+async def test_forbid_after_undo_to_prefix_uses_takeback_not_cold_yxboard():
+    procs = []
+
+    async def spawn(**kw):
+        p = FakeProc(["8,8", "5,5", "FORBID ."])
+        procs.append(p)
+        return p
+
+    reg = make_registry(spawn)
+    await reg.compute_move("g", [(7, 7)], P)
+    await reg.compute_move("g", [(7, 7), (8, 8), (6, 6)], P)
+    assert reg._slots["g"].synced == [(7, 7), (8, 8), (6, 6), (5, 5)]
+
+    procs[0].sent.clear()
+    await reg.forbidden_points("g", [(7, 7), (8, 8)])
+
+    sent = [c for batch in procs[0].sent for c in batch]
+    assert "START 15" not in sent and "YXBOARD" not in sent
+    assert sent == ["TAKEBACK 5,5", "TAKEBACK 6,6", "YXSHOWFORBID"]
+    assert reg._slots["g"].synced == [(7, 7), (8, 8)]
+    await reg.close()
+
+
+@pytest.mark.asyncio
+async def test_forbid_non_prefix_rejects_without_cold_resetting_live_process():
+    procs = []
+
+    async def spawn(**kw):
+        p = FakeProc(["8,8"])
+        procs.append(p)
+        return p
+
+    reg = make_registry(spawn)
+    await reg.compute_move("g", [(7, 7)], P)
+    procs[0].sent.clear()
+
+    from app.rapfi.adapter import EngineError
+
+    with pytest.raises(EngineError):
+        await reg.forbidden_points("g", [(6, 6), (5, 5)])
+
+    assert len(procs) == 1
+    assert procs[0].alive is True
+    assert procs[0].sent == []
+    assert reg._slots["g"].synced == [(7, 7), (8, 8)]
     await reg.close()
 
 

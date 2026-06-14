@@ -84,18 +84,18 @@ def plan_sync(synced: Sequence[Point] | None, target: Sequence[Point]) -> SyncPl
     """Планировщик инкрементальной синхронизации позиции.
 
     Если synced is None — движок не инициализирован, нужен холодный старт.
-    Иначе: находим общий префикс; если после него в target ровно один ход —
-    горячий путь (TAKEBACK* + TURN); в остальных аномальных случаях — cold."""
+    Иначе: находим общий префикс. tail=1 — TAKEBACK* + TURN; tail=0 —
+    TAKEBACK* + YXNBEST 1 (думать на текущей доске). tail>1 — аномалия."""
     if synced is None:
         return SyncPlan(cold=True, takebacks=(), turn=None)
     n = 0
     while n < len(synced) and n < len(target) and synced[n] == target[n]:
         n += 1
     tail = target[n:]
-    if len(tail) != 1:  # 0 (target⊆synced) или >1 (разрыв) — оба в cold
+    if len(tail) > 1:
         return SyncPlan(cold=True, takebacks=(), turn=None)
     takebacks = tuple(reversed(synced[n:]))
-    return SyncPlan(cold=False, takebacks=takebacks, turn=tail[0])
+    return SyncPlan(cold=False, takebacks=takebacks, turn=tail[0] if tail else None)
 
 
 def tunable_commands(params: EngineParams) -> list[str]:
@@ -108,6 +108,19 @@ def turn_commands(point: Point) -> list[str]:
     _validate_moves([point])
     x, y = point
     return [f"TURN {x},{y}"]
+
+
+def think_commands() -> list[str]:
+    """YXNBEST 1 — запросить лучший ход для текущей доски без добавления хода соперника."""
+    return ["YXNBEST 1"]
+
+
+def hashclear_commands() -> list[str]:
+    """YXHASHCLEAR — очистить транспозиционную таблицу/search-state движка
+    (gomocup.cpp:clearHash → Search::Threads.clear). Слать ПОСЛЕ TAKEBACK и ДО
+    следующего расчёта: откат оставляет старый hash/cache, и движок на той же
+    позиции отвечает иначе, чем на свежей. Ответ движка — MESSAGE (шум), не OK."""
+    return ["YXHASHCLEAR"]
 
 
 def takeback_commands(points: Sequence[Point]) -> list[str]:

@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel
 
 
@@ -13,3 +15,15 @@ class CreateGameBody(BaseModel):
 class LevelDTO(BaseModel):
     id: str
     name: str
+
+
+class GameSummaryDTO(BaseModel):
+    id: str
+    status: str
+    section: str  # "current"|"finished"|"favorite"
+    level_id: str | None  # уровень engine-оппонента, None если нет engine-стороны
+    your_color: str | None
+    move_count: int
+    favorite: bool
+    updated_at: datetime | None
+    finished_at: datetime | None

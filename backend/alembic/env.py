@@ -20,6 +20,7 @@ from app.config import Settings
 from app.db.base import Base
 import app.models.user  # noqa: F401
 import app.models.game  # noqa: F401
+import app.models.user_settings  # noqa: F401
 
 target_metadata = Base.metadata
 _settings = Settings()

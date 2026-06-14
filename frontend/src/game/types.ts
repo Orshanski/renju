@@ -25,6 +25,20 @@ export type GameStateDTO = {
 
 export type LevelDTO = { id: string; name: string };
 
+export type Section = "current" | "finished" | "favorite";
+
+export type GameSummaryDTO = {
+  id: string;
+  status: GameStatus;
+  section: Section;
+  level_id: string | null;
+  your_color: Color | null;
+  move_count: number;
+  favorite: boolean;
+  updated_at: string | null;
+  finished_at: string | null;
+};
+
 export type GameEventMessage =
   | { seq: number; type: "move"; payload: { by: Color; point: Point; move_index: number } }
   | { seq: number; type: "status"; payload: { status: GameStatus; winning_line?: Point[] } }

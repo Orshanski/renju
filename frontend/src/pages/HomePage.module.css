@@ -1,7 +1,16 @@
-/* по prototype/index.html (eyebrow/title/sub); токены — @value (tokens.module.css) */
-@value sumiSoft, vermillion, vermillionDeep, shadowSm, fontSerif, fontSans from "../styles/tokens.module.css";
+/* по prototype/index.html (eyebrow/sub); токены — @value (tokens.module.css) */
+@value sumiSoft, sumiFaint, vermillion, vermillionDeep, shadowSm, fontSerif, fontSans from "../styles/tokens.module.css";
 
 .wrap { max-width: 1120px; margin: 0 auto; }
+
+/* шапка: eyebrow слева, кнопка «＋ Новая партия» справа */
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
 .eyebrow {
   font-family: fontSerif;
   font-weight: 600;
@@ -14,11 +23,10 @@
   gap: 10px;
 }
 .eyebrow::before { content: ""; width: 26px; height: 1px; background: vermillion; display: inline-block; }
-.title { font-family: fontSerif; font-weight: 800; font-size: 40px; line-height: 1.05; margin: 14px 0 6px; letter-spacing: -0.5px; }
+
 .sub { color: sumiSoft; font-size: 15px; font-weight: 300; }
 
 .newBtn {
-  margin-top: 22px;
   font-family: fontSans;
   font-weight: 500;
   font-size: 15px;
@@ -32,5 +40,44 @@
   box-shadow: shadowSm;
   transition: 0.18s;
 }
-.newBtn:hover:enabled { background: vermillionDeep; transform: translateY(-1px); }
-.newBtn:disabled { opacity: 0.6; cursor: default; }
+.newBtn:hover { background: vermillionDeep; transform: translateY(-1px); }
+
+/* таб-бар */
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+}
+
+.tab {
+  font-family: fontSans;
+  font-size: 14px;
+  font-weight: 400;
+  color: sumiFaint;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.tab:hover { color: sumiSoft; }
+
+.tabActive {
+  font-family: fontSans;
+  font-size: 14px;
+  font-weight: 600;
+  color: vermillion;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid vermillion;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+/* сетка карточек */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}

@@ -11,12 +11,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..auth import CurrentUser, decode_token, fetch_token_epoch, get_current_user
 from ..db.deps import get_session
+from ..domain.retention import Section, game_section
 from ..domain.rules import winning_line
 from ..domain.values import GameStatus, MoveRejected, UndoRejected
 from ..exceptions import BadInputError
-from ..game.dtos import CreateGameBody, LevelDTO
+from ..game.dtos import CreateGameBody, GameSummaryDTO, LevelDTO
 from ..game.repository import SqlGameRepository
 from ..game.service import GameService
+from ..game.settings_repository import SqlSettingsRepository
 from ..levels_config import resolve_level
 from ..logging_utils import safe
 from .auth import current_user
@@ -32,6 +34,7 @@ def _build_service(app: FastAPI, session: AsyncSession) -> GameService:
         hub=app.state.event_hub,
         adapter=app.state.adapter,
         levels=levels,
+        settings_repo=SqlSettingsRepository(session),
     )
 
 
@@ -88,6 +91,29 @@ def _your_color(controllers: dict, user_id: int) -> str | None:
         if c["kind"] == "user" and c["user_id"] == user_id:
             return side
     return None
+
+
+def _engine_level_id(controllers: dict) -> str | None:
+    """level_id engine-оппонента для summary; None если engine-стороны нет (или '-' нет смысла)."""
+    for c in controllers.values():
+        if c.get("kind") == "engine":
+            lid = c.get("level_id", "-")
+            return lid if lid != "-" else None
+    return None
+
+
+def _summary(game, user_id: int) -> GameSummaryDTO:
+    return GameSummaryDTO(
+        id=game.id,
+        status=game.status,
+        section=game_section(game.status, game.favorite).value,
+        level_id=_engine_level_id(game.controllers),
+        your_color=_your_color(game.controllers, user_id),
+        move_count=len(game.moves),
+        favorite=game.favorite,
+        updated_at=game.updated_at,
+        finished_at=game.finished_at,
+    )
 
 
 def _state(game, user_id: int, hub) -> dict:
@@ -148,6 +174,51 @@ async def list_games(
         _state(g, user.user_id, hub)
         for g in await _service(request, session).list_games(user.user_id)
     ]
+
+
+@router.get("/games/summary", response_model=list[GameSummaryDTO])
+async def list_games_summary(
+    section: Section,  # обязательный фильтр (current|finished|favorite); невалидное → 422
+    request: Request,
+    user: Annotated[CurrentUser, Depends(current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+):
+    games = await _service(request, session).list_games(user.user_id)
+    return [
+        _summary(g, user.user_id) for g in games if game_section(g.status, g.favorite) is section
+    ]
+
+
+@router.delete("/games/{game_id}", status_code=204)
+async def delete_game(
+    game_id: str,
+    request: Request,
+    user: Annotated[CurrentUser, Depends(current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+):
+    await _service(request, session).delete_game(game_id, user.user_id)
+
+
+@router.post("/games/{game_id}/favorite")
+async def favorite_game(
+    game_id: str,
+    request: Request,
+    user: Annotated[CurrentUser, Depends(current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+):
+    await _service(request, session).favorite_game(game_id, user.user_id)
+    return True
+
+
+@router.post("/games/{game_id}/unfavorite")
+async def unfavorite_game(
+    game_id: str,
+    request: Request,
+    user: Annotated[CurrentUser, Depends(current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+):
+    await _service(request, session).unfavorite_game(game_id, user.user_id)
+    return True
 
 
 @router.get("/games/{game_id}")

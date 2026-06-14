@@ -11,6 +11,7 @@ class GameRepository(Protocol):
     async def get(self, game_id: str) -> Game | None: ...
     async def list_by_owner(self, owner_id: int) -> list[Game]: ...
     async def update(self, game: Game) -> None: ...
+    async def delete(self, game_id: str) -> None: ...
 
 
 class SqlGameRepository:
@@ -36,6 +37,12 @@ class SqlGameRepository:
     async def update(self, game: Game) -> None:
         await self._s.commit()  # game уже tracked сессией; коммитим изменения
 
+    async def delete(self, game_id: str) -> None:
+        obj = await self._s.get(Game, game_id)
+        if obj is not None:
+            await self._s.delete(obj)
+            await self._s.commit()
+
 
 class InMemoryGameRepository:
     def __init__(self):
@@ -52,3 +59,6 @@ class InMemoryGameRepository:
 
     async def update(self, game: Game) -> None:
         self._d[game.id] = game
+
+    async def delete(self, game_id: str) -> None:
+        self._d.pop(game_id, None)

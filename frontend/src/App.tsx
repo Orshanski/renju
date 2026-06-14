@@ -9,6 +9,7 @@ import { Shell } from "./components/Shell";
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const HomePage = lazy(() => import("./pages/HomePage"));
 const GamePage = lazy(() => import("./pages/GamePage"));
+const NewGamePage = lazy(() => import("./pages/NewGamePage"));
 
 function UnauthorizedBridge() {
   const navigate = useNavigate();
@@ -32,6 +33,7 @@ export default function App() {
             <Route element={<ProtectedRoute />}>
               <Route element={<Shell />}>
                 <Route path="/" element={<HomePage />} />
+                <Route path="/new" element={<NewGamePage />} />
                 <Route path="/game/:gameId" element={<GamePage />} />
               </Route>
             </Route>
