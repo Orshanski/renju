@@ -249,6 +249,8 @@ table.tbl tr:hover td{background:rgba(60,45,25,.04)}
 .pulse{width:9px;height:9px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 0 rgba(63,122,78,.5);animation:pl 1.6s infinite}
 @keyframes pl{0%{box-shadow:0 0 0 0 rgba(63,122,78,.5)}70%{box-shadow:0 0 0 9px rgba(63,122,78,0)}100%{box-shadow:0 0 0 0 rgba(63,122,78,0)}}
 .engcfg{display:grid;gap:18px;max-width:520px}
+.cellnum{width:64px;padding:6px 8px;border:1px solid rgba(60,45,25,.22);border-radius:7px;background:#fbf6ea;font-family:inherit;font-size:14px;color:var(--sumi);text-align:center;font-variant-numeric:tabular-nums}
+.cellnum:focus{outline:none;border-color:var(--indigo);box-shadow:0 0 0 3px rgba(39,65,95,.12)}
 
 /* ---------- MODAL ---------- */
 .modal-bg{position:fixed;inset:0;z-index:20;background:rgba(35,25,12,.5);backdrop-filter:blur(3px);display:none;place-items:center;animation:fade .2s both}
@@ -265,6 +267,9 @@ table.tbl tr:hover td{background:rgba(60,45,25,.04)}
 .dice{display:flex;align-items:center;gap:10px;background:rgba(189,51,38,.08);border:1px dashed rgba(189,51,38,.35);border-radius:11px;padding:12px 14px;color:var(--vermillion-deep);font-size:13.5px}
 .modal h2{font-family:"Shippori Mincho";font-weight:800;font-size:24px}
 .modal .mclose{float:right;cursor:pointer;color:var(--sumi-faint);font-size:22px;line-height:1}
+.rolepick{flex:1;padding:11px;border:1px solid rgba(60,45,25,.25);border-radius:9px;background:#fbf6ea;font-family:inherit;font-size:14px;cursor:pointer;color:var(--sumi-soft);transition:.16s}
+.rolepick:hover{border-color:var(--indigo)}
+.rolepick.sel{background:var(--indigo);color:#f1ead9;border-color:var(--indigo)}
 
 .attr{position:fixed;bottom:6px;right:11px;z-index:30;font-size:10px;letter-spacing:.4px;opacity:.4;color:var(--sumi-soft)}
 .attr a{color:inherit;text-decoration:none}
@@ -396,6 +401,7 @@ table.tbl tr:hover td{background:rgba(60,45,25,.04)}
       <div class="eyebrow">Профиль</div>
       <h1 class="title">Настройки</h1>
       <p class="sub" style="margin-bottom:10px">Глобально для всех твоих партий.</p>
+      <div class="eyebrow" style="margin:24px 0 14px">Откаты</div>
       <div class="settings">
         <div class="setrow">
           <div><div class="label">Отмена ходов (undo)</div><div class="desc">Разрешить откатывать ходы во время игры.</div></div>
@@ -412,6 +418,29 @@ table.tbl tr:hover td{background:rgba(60,45,25,.04)}
           <div class="toggle" onclick="this.classList.toggle('on')"></div>
         </div>
       </div>
+      <div class="eyebrow" style="margin:30px 0 14px">Управление партиями</div>
+      <div class="settings">
+        <div class="setrow">
+          <div><div class="label">Партий на раздел</div><div class="desc">Верхний предел партий в каждом разделе (текущие / завершённые / избранное). 10–100.</div></div>
+          <div class="stepper">
+            <button onclick="keep(-10)">−</button><div class="num" id="keepNum">100</div><button onclick="keep(10)">＋</button>
+          </div>
+        </div>
+        <div class="setrow">
+          <div><div class="label">Удалить текущие</div><div class="desc">Стереть все незавершённые партии.</div></div>
+          <button class="btn btn-ghost" style="padding:10px 16px;color:var(--vermillion);border-color:rgba(189,51,38,.4)">Удалить все</button>
+        </div>
+        <div class="setrow">
+          <div><div class="label">Удалить завершённые</div><div class="desc">Стереть все сыгранные партии.</div></div>
+          <button class="btn btn-ghost" style="padding:10px 16px;color:var(--vermillion);border-color:rgba(189,51,38,.4)">Удалить все</button>
+        </div>
+      </div>
+      <div style="margin-top:30px;max-width:440px">
+        <div class="eyebrow" style="margin-bottom:14px">Сменить пароль</div>
+        <div class="field"><label>Текущий пароль</label><input type="password"></div>
+        <div class="field"><label>Новый пароль</label><input type="password"></div>
+        <button class="btn btn-primary btn-block" style="margin-top:10px">Обновить пароль</button>
+      </div>
     </section>
 
     <!-- ADMIN -->
@@ -420,13 +449,12 @@ table.tbl tr:hover td{background:rgba(60,45,25,.04)}
       <h1 class="title">Управление</h1>
       <div class="admin-tabs">
         <button class="active" onclick="atab('users',this)">Пользователи</button>
-        <button onclick="atab('games',this)">Партии</button>
         <button onclick="atab('engine',this)">Движок</button>
         <button onclick="atab('health',this)">Состояние</button>
       </div>
 
       <div id="atab-users" class="atab show">
-        <div style="display:flex;justify-content:flex-end;margin-bottom:14px"><button class="btn btn-vermillion" style="padding:10px 16px">＋ Завести пользователя</button></div>
+        <div style="display:flex;justify-content:flex-end;margin-bottom:14px"><button class="btn btn-vermillion" style="padding:10px 16px" onclick="openUser()">＋ Завести пользователя</button></div>
         <table class="tbl">
           <thead><tr><th>Имя</th><th>Роль</th><th>Создан</th><th style="text-align:right">Действия</th></tr></thead>
           <tbody>
@@ -436,23 +464,22 @@ table.tbl tr:hover td{background:rgba(60,45,25,.04)}
         </table>
       </div>
 
-      <div id="atab-games" class="atab">
-        <table class="tbl">
-          <thead><tr><th>№</th><th>Владелец</th><th>Статус</th><th>Ход</th><th style="text-align:right"></th></tr></thead>
+      <div id="atab-engine" class="atab">
+        <p class="sub" style="margin-bottom:18px;max-width:640px">Сила и время раздумий по уровням — калибруется на живой игре. Сила 0–100 (100 = полная мощь движка). Меняется без рестарта, применяется к новым партиям.</p>
+        <table class="tbl" style="max-width:540px">
+          <thead><tr><th>Уровень</th><th>Сила (0–100)</th><th>Время на ход, с</th></tr></thead>
           <tbody>
-            <tr><td>47</td><td>alexey</td><td><span class="tag think" style="display:inline-block">ход игрока</span></td><td>24</td><td style="text-align:right"><button class="iconbtn">открыть</button><button class="iconbtn">удалить</button></td></tr>
-            <tr><td>46</td><td>alexey</td><td><span class="tag go" style="display:inline-block">движок думает</span></td><td>12</td><td style="text-align:right"><button class="iconbtn">открыть</button><button class="iconbtn">удалить</button></td></tr>
-            <tr><td>45</td><td>guest</td><td><span class="tag done" style="display:inline-block">завершена</span></td><td>38</td><td style="text-align:right"><button class="iconbtn">открыть</button><button class="iconbtn">удалить</button></td></tr>
+            <tr><td>Новичок</td><td><input class="cellnum" type="number" value="5" min="0" max="100"></td><td><input class="cellnum" type="number" value="1.0" min="0.2" step="0.5"></td></tr>
+            <tr><td>Лёгкий</td><td><input class="cellnum" type="number" value="15" min="0" max="100"></td><td><input class="cellnum" type="number" value="1.5" min="0.2" step="0.5"></td></tr>
+            <tr><td>Ниже среднего</td><td><input class="cellnum" type="number" value="35" min="0" max="100"></td><td><input class="cellnum" type="number" value="2.0" min="0.2" step="0.5"></td></tr>
+            <tr><td>Выше среднего</td><td><input class="cellnum" type="number" value="55" min="0" max="100"></td><td><input class="cellnum" type="number" value="2.5" min="0.2" step="0.5"></td></tr>
+            <tr><td>Сложный</td><td><input class="cellnum" type="number" value="75" min="0" max="100"></td><td><input class="cellnum" type="number" value="4.0" min="0.2" step="0.5"></td></tr>
+            <tr><td>Мастер</td><td><input class="cellnum" type="number" value="90" min="0" max="100"></td><td><input class="cellnum" type="number" value="6.0" min="0.2" step="0.5"></td></tr>
+            <tr><td>Бог</td><td><input class="cellnum" type="number" value="100" min="0" max="100"></td><td><input class="cellnum" type="number" value="7.0" min="0.2" step="0.5"></td></tr>
           </tbody>
         </table>
-      </div>
-
-      <div id="atab-engine" class="atab">
-        <div class="engcfg">
-          <div class="setrow" style="padding-top:0"><div><div class="label">Уровень по умолчанию</div><div class="desc">С каким уровнем создаётся новая партия.</div></div><span class="level-pill">Уверенный</span></div>
-          <div class="setrow"><div><div class="label">Нейросеть (NNUE)</div><div class="desc">Полная сила движка. Выключить — режим-fallback на слабом CPU.</div></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
-          <div class="setrow"><div><div class="label">Время на ход (мастер)</div><div class="desc">Верхний предел раздумий для высшего уровня.</div></div><span class="v" style="font-weight:600">5.0 с</span></div>
-        </div>
+        <div class="setrow" style="max-width:540px"><div><div class="label">Нейросеть (NNUE)</div><div class="desc">Полная сила движка. Выключить — fallback-режим на слабом CPU.</div></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+        <div style="margin-top:18px"><button class="btn btn-primary">Сохранить</button></div>
       </div>
 
       <div id="atab-health" class="atab">
@@ -465,6 +492,24 @@ table.tbl tr:hover td{background:rgba(60,45,25,.04)}
       </div>
     </section>
   </main>
+</div>
+
+<!-- ===== CREATE USER MODAL ===== -->
+<div class="modal-bg" id="userModal">
+  <div class="modal" style="width:min(440px,92vw)">
+    <span class="mclose" onclick="closeUser()">✕</span>
+    <div class="eyebrow">Новый пользователь</div>
+    <h2 class="serif">Завести пользователя</h2>
+    <div class="field" style="margin-top:18px"><label>Имя</label><input type="text" placeholder="логин"></div>
+    <div class="field"><label>Временный пароль</label><input type="text" placeholder="пользователь сменит сам"></div>
+    <div class="field"><label>Роль</label>
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button type="button" class="rolepick sel" onclick="pickRole(this)">Игрок</button>
+        <button type="button" class="rolepick" onclick="pickRole(this)">Админ</button>
+      </div>
+    </div>
+    <button class="btn btn-primary btn-block" style="margin-top:22px" onclick="closeUser()">Создать</button>
+  </div>
 </div>
 
 <!-- ===== NEW GAME MODAL ===== -->
@@ -560,6 +605,7 @@ function toggleThink(){ const t=document.getElementById('thinkingRow'); t.style.
 // ---- settings ----
 let lim=Infinity;
 function limit(d){ if(lim===Infinity){lim = d>0?Infinity:10;} else {lim=Math.max(0,lim+d);} if(lim>10)lim=Infinity; document.getElementById('limitNum').textContent = lim===Infinity?'∞':lim; }
+function keep(d){ const n=document.getElementById('keepNum'); n.textContent=Math.max(10,Math.min(100,(+n.textContent)+d)); } // лимит партий на раздел 10..100
 function syncUndo(t){ const on=t.classList.contains('on'); document.getElementById('limitStepper').classList.toggle('dim',!on); document.getElementById('rowEnd').style.opacity=on?1:.4; }
 
 // ---- admin ----
@@ -569,8 +615,12 @@ function atab(name,btn){ document.querySelectorAll('.atab').forEach(a=>a.classLi
 function openNew(){ document.getElementById('newModal').classList.add('show'); }
 function closeNew(){ document.getElementById('newModal').classList.remove('show'); }
 function selLvl(el){ document.querySelectorAll('.lvl').forEach(l=>l.classList.remove('sel')); el.classList.add('sel'); }
+function openUser(){ document.getElementById('userModal').classList.add('show'); }
+function closeUser(){ document.getElementById('userModal').classList.remove('show'); }
+function pickRole(b){ b.parentNode.querySelectorAll('.rolepick').forEach(x=>x.classList.remove('sel')); b.classList.add('sel'); }
 function startGame(){ closeNew(); go('game'); }
 document.getElementById('newModal').addEventListener('click',e=>{if(e.target.id==='newModal')closeNew();});
+document.getElementById('userModal').addEventListener('click',e=>{if(e.target.id==='userModal')closeUser();});
 </script>
 </body>
 </html>
