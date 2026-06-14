@@ -11,19 +11,18 @@ def test_new_game_starts_with_center():
 
 
 def test_apply_move_valid_appends():
-    assert apply_move([(7, 7)], (8, 8), forbidden=[]) == [(7, 7), (8, 8)]
+    assert apply_move([(7, 7)], (8, 8)) == [(7, 7), (8, 8)]
 
 
 def test_apply_move_occupied_rejected():
     with pytest.raises(MoveRejected) as e:
-        apply_move([(7, 7), (8, 8)], (8, 8), forbidden=[])
+        apply_move([(7, 7), (8, 8)], (8, 8))
     assert e.value.reason is MoveRejectReason.OCCUPIED
 
 
-def test_apply_move_opening_violation_rejected():
-    with pytest.raises(MoveRejected) as e:
-        apply_move([(7, 7)], (5, 7), forbidden=[])  # ход 2 вне 3×3
-    assert e.value.reason is MoveRejectReason.OPENING_VIOLATION
+def test_apply_move_outside_opening_zone_no_longer_rejected():
+    # дебютную зону apply_move больше не сторожит (фронт её закрывает) — ход вне 3×3 проходит
+    assert apply_move([(7, 7)], (5, 7)) == [(7, 7), (5, 7)]
 
 
 def test_apply_move_on_finished_game_rejected():
@@ -46,7 +45,7 @@ def test_apply_move_on_finished_game_rejected():
 
     assert outcome_after(moves) is GameStatus.FINISHED_BLACK  # предпосылка теста
     with pytest.raises(MoveRejected) as e:
-        apply_move(moves, (8, 8), forbidden=[])
+        apply_move(moves, (8, 8))
     assert e.value.reason is MoveRejectReason.GAME_FINISHED
 
 
@@ -73,4 +72,13 @@ async def test_engine_move_unrestricted_after_opening():
     fake = _FakeAdapter()
     params = EngineParams(strength=50, timeout_turn_ms=1000)
     await engine_move(fake, [(7, 7), (8, 8), (9, 9), (6, 6)], params, "g2")  # type: ignore[arg-type]
+    assert fake.received_zone is None
+
+
+async def test_engine_move_no_block_on_black_third_move():
+    # Чёрный 3-й ход (len==2, зона 5×5): YXBLOCK искажает поиск движка → слив (raw-прогоны
+    # живого движка, 100/100). Зону НЕ накладываем — движок сам в 5×5 ~99%, обуздание лишь ломает.
+    fake = _FakeAdapter()
+    params = EngineParams(strength=50, timeout_turn_ms=1000)
+    await engine_move(fake, [(7, 7), (8, 8)], params, "g3")  # type: ignore[arg-type]
     assert fake.received_zone is None

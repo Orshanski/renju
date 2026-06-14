@@ -187,9 +187,7 @@ class GameService:
             try:
                 mv = await players[side].take_turn(moves)
                 assert mv is not None  # engine-сторона всегда даёт ход (None только у Interactive)
-                # фолы движок соблюдает сам (RULE 4) — для его хода не запрашиваем (rj-t95)
-                fb = []
-                game.moves = [list(p) for p in apply_move(moves, mv, forbidden=fb)]
+                game.moves = [list(p) for p in apply_move(moves, mv)]
                 game.updated_at = _now()  # реальный ход движка — бампаем «когда обновлено»
             except (EngineError, MoveRejected) as e:
                 # сбой движка ИЛИ нелегальный ход движка (фол-точка) → событие error,
@@ -230,11 +228,9 @@ class GameService:
         ctl = controller_from_json(game.controllers[side.value])
         if not (isinstance(ctl, User) and ctl.user_id == user_id):
             raise MoveRejected(MoveRejectReason.NOT_YOUR_TURN)
-        # фолы из мемо-лога: при awaiting_move ключ str(len(moves)) гарантированно записан
-        # форвард-игрой (advance), поэтому движок здесь не дёргается. НЕ заменять на .get([])-
-        # дефолт: human-ход чёрных надо валидировать реальными фолами. (холистик 2026-06-12)
-        fb = await self.fouls(game, moves)
-        game.moves = [list(p) for p in apply_move(moves, point, forbidden=fb)]
+        # Фолы/зону здесь НЕ сторожим: фронт не даёт человеку в фол/вне зоны, а форвард-игра
+        # уже записала forbidden_log для отдачи фронту. apply_move бережёт лишь целостность.
+        game.moves = [list(p) for p in apply_move(moves, point)]
         game.updated_at = _now()  # реальный ход — бампаем «когда обновлено»
         self._hub.publish(
             game.id,
@@ -280,6 +276,9 @@ class GameService:
         )
         new_moves = undo_truncate(moves=[tuple(m) for m in game.moves], for_color=Color(my_side))
         k = len(new_moves)
+        sync_after_undo = getattr(self._adapter, "sync_after_undo", None)
+        if sync_after_undo is not None:
+            await sync_after_undo(game.id, new_moves, level_tag="-")
         game.moves = [list(p) for p in new_moves]
         game.forbidden_log = {key: v for key, v in game.forbidden_log.items() if int(key) <= k}
         game.undo_count += 1

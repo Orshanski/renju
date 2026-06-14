@@ -10,59 +10,40 @@ from app.domain.values import (
 )
 
 
-def test_valid_move_in_5x5_passes():
-    # позиция [center, white]: ход 3 (чёрные), зона 5×5 — (9,9) внутри
-    validate_move(moves=[(7, 7), (8, 8)], point=(9, 9), forbidden=[])  # не бросает
+def test_valid_move_passes():
+    validate_move(moves=[(7, 7), (8, 8)], point=(9, 9))  # целостность ок → не бросает
 
 
 def test_out_of_board_rejected():
     for bad in [(-1, 0), (0, -1), (15, 0), (0, 15)]:
         with pytest.raises(MoveRejected) as e:
-            validate_move(moves=[], point=bad, forbidden=[])
+            validate_move(moves=[], point=bad)
         assert e.value.reason is MoveRejectReason.OUT_OF_BOARD
 
 
 def test_occupied_cell_rejected():
     with pytest.raises(MoveRejected) as e:
-        validate_move(moves=[(7, 7), (8, 8)], point=(8, 8), forbidden=[])
+        validate_move(moves=[(7, 7), (8, 8)], point=(8, 8))
     assert e.value.reason is MoveRejectReason.OCCUPIED
 
 
-def test_occupied_center_in_opening_is_occupied_not_opening_violation():
-    # ход 2 (зона 3×3): клик в занятый центр → OCCUPIED раньше, чем проверка зоны
+def test_occupied_center_rejected():
     with pytest.raises(MoveRejected) as e:
-        validate_move(moves=[(7, 7)], point=(7, 7), forbidden=[])
+        validate_move(moves=[(7, 7)], point=(7, 7))
     assert e.value.reason is MoveRejectReason.OCCUPIED
 
 
-def test_opening_violation_move_two_outside_3x3():
-    # ход 2 (зона 3×3): (5,7) вне квадрата
-    with pytest.raises(MoveRejected) as e:
-        validate_move(moves=[(7, 7)], point=(5, 7), forbidden=[])
-    assert e.value.reason is MoveRejectReason.OPENING_VIOLATION
+def test_move_outside_opening_zone_no_longer_rejected():
+    # Дебютную зону validate_move больше НЕ сторожит (её закрывает фронт; на бэке зона —
+    # поставщик ограничений, не сторож). Ход вне 3×3/5×5 проходит целостность.
+    validate_move(moves=[(7, 7)], point=(5, 7))  # ход 2 вне 3×3 — не бросает
+    validate_move(moves=[(7, 7), (8, 8)], point=(10, 7))  # ход 3 вне 5×5 — не бросает
 
 
-def test_opening_violation_move_three_outside_5x5():
-    # ход 3 (зона 5×5): (10,7) вне квадрата
-    with pytest.raises(MoveRejected) as e:
-        validate_move(moves=[(7, 7), (8, 8)], point=(10, 7), forbidden=[])
-    assert e.value.reason is MoveRejectReason.OPENING_VIOLATION
-
-
-def test_inside_3x3_passes():
-    validate_move(moves=[(7, 7)], point=(8, 8), forbidden=[])  # не бросает
-
-
-def test_forbidden_point_rejected_for_black():
-    # len=2 → ход чёрных; (9,9) внутри 5×5, но в forbidden → FORBIDDEN
-    with pytest.raises(MoveRejected) as e:
-        validate_move(moves=[(7, 7), (8, 8)], point=(9, 9), forbidden=[(9, 9)])
-    assert e.value.reason is MoveRejectReason.FORBIDDEN
-
-
-def test_forbidden_ignored_for_white():
-    # len=1 → ход белых; forbidden к белым не применяется
-    validate_move(moves=[(7, 7)], point=(8, 8), forbidden=[(8, 8)])  # не бросает
+def test_foul_point_no_longer_rejected():
+    # Фолы validate_move больше НЕ сторожит (движок соблюдает сам, человеку перекрыты
+    # фронтом). Ход в бывшую forbidden-точку проходит целостность.
+    validate_move(moves=[(7, 7), (8, 8)], point=(9, 9))  # не бросает
 
 
 # rj-8sc — статус-машина этапа 2: проверка очереди снята с доменного правила

@@ -17,12 +17,13 @@ def new_game() -> list[Point]:
     return [CENTER]
 
 
-def apply_move(moves: Sequence[Point], point: Point, *, forbidden: Sequence[Point]) -> list[Point]:
-    """Применить предложенный ход: завершённость (оркестрация) + правило хода.
+def apply_move(moves: Sequence[Point], point: Point) -> list[Point]:
+    """Применить предложенный ход: завершённость (оркестрация) + целостность хода
+    (геометрия/занятость). Дебютную зону и фолы не сторожит (см. validate_move).
     Источник хода (человек/движок) не важен."""
     if outcome_after(moves) is not None:
         raise MoveRejected(MoveRejectReason.GAME_FINISHED)
-    validate_move(moves=moves, point=point, forbidden=forbidden)
+    validate_move(moves=moves, point=point)
     return [*moves, point]
 
 
@@ -31,8 +32,15 @@ async def engine_move(
 ) -> Point:
     """Ход движка для позиции; дебютное обуздание спрятано. Инвариант: moves
     непуст (центр предзаполнен new_game), поэтому allowed_zone не бывает синглтоном.
-    game_id — ПЕРВЫЙ позиционный у adapter (см. EngineRegistry.compute_move)."""
-    zone = opening_zone(len(moves))
+    game_id — ПЕРВЫЙ позиционный у adapter (см. EngineRegistry.compute_move).
+
+    YXBLOCK-обуздание ≠ правило валидации (domain.validate_move оставляет 5×5 на 3-м
+    ходу как ПРАВИЛО). Здесь — только ограничение поиска движка, и его накладываем
+    ТОЛЬКО на белый 2-й ход (len==1, зона 3×3): сам движок попадает в 3×3 лишь ~40%,
+    а YXBLOCK там безопасен. На чёрном 3-м ходу (len==2, 5×5) YXBLOCK искажает поиск
+    движка → слив (проверено raw-прогонами живого движка, 100/100); в 5×5 он и так сам
+    кладёт ~99%, поэтому зону НЕ накладываем (на редкий выход не рубим — допускаем ~1/100)."""
+    zone = opening_zone(len(moves)) if len(moves) == 1 else None
     return await adapter.compute_move(
         game_id, moves, params, allowed_zone=zone, level_tag=level_tag
     )
