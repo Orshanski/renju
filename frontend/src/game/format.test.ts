@@ -20,3 +20,10 @@ it("sectionDateLabel: текущая — обновлено(updated_at); зав�
   expect(sectionDateLabel("current", { updated_at: null, finished_at: null })).toBe("");
   expect(sectionDateLabel("finished", { updated_at: null, finished_at: null })).toBe("");
 });
+
+it("sectionDateLabel: naive-UTC время (без Z) трактуется как UTC, не локально", () => {
+  // бэк отдаёт время без пояса; метка не должна зависеть от того, дописан ли 'Z'
+  const naive = { updated_at: "2026-06-13T10:00:00", finished_at: null };
+  const withZ = { updated_at: "2026-06-13T10:00:00Z", finished_at: null };
+  expect(sectionDateLabel("current", naive)).toBe(sectionDateLabel("current", withZ));
+});
