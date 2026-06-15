@@ -1,9 +1,9 @@
 import pytest
 
 from app.domain.engine_params import EngineParams
+from app.domain.errors import MoveRejected, MoveRejectReason
 from app.domain.opening import opening_zone
-from app.domain.values import MoveRejected, MoveRejectReason
-from app.game_service import apply_move, engine_move, new_game
+from app.game.moves import apply_move, engine_move, new_game
 
 
 def test_new_game_starts_with_center():

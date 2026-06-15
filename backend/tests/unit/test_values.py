@@ -37,7 +37,8 @@ def test_game_status_values_match_spec_enum():
 
 
 def test_status_neutral_names():
-    from app.domain.values import GameStatus, MoveRejectReason, UndoRejectReason
+    from app.domain.errors import MoveRejectReason, UndoRejectReason
+    from app.domain.values import GameStatus
 
     assert GameStatus.AWAITING_MOVE.value == "awaiting_move"
     assert GameStatus.OPPONENT_THINKING.value == "opponent_thinking"

@@ -1,9 +1,11 @@
 from collections.abc import Sequence
 from typing import Protocol
 
+from ..domain.engine_params import EngineParams
 from ..domain.values import Point
-from ..game_service import engine_move
 from .controllers import Controller, User
+from .moves import engine_move
+from .ports import EngineAdapter
 
 
 class Player(Protocol):
@@ -19,7 +21,9 @@ class InteractivePlayer:
 
 
 class EnginePlayer:
-    def __init__(self, adapter, params, game_id: str, level_tag: str = "-"):
+    def __init__(
+        self, adapter: EngineAdapter, params: EngineParams, game_id: str, level_tag: str = "-"
+    ):
         self._adapter = adapter
         self._params = params
         self._game_id = game_id
@@ -29,7 +33,7 @@ class EnginePlayer:
         return await engine_move(self._adapter, moves, self._params, self._game_id, self._level_tag)
 
 
-def make_player(ctl: Controller, adapter, levels: dict, game_id: str) -> Player:
+def make_player(ctl: Controller, adapter: EngineAdapter, levels: dict, game_id: str) -> Player:
     if isinstance(ctl, User):
         return InteractivePlayer(ctl.user_id)  # game_id игнорируется (ход придёт подачей)
     # levels: level_id → EngineParams; level_tag = level_id оппонента (для логов)

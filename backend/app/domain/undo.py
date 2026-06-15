@@ -2,7 +2,8 @@
 
 from dataclasses import dataclass
 
-from .values import GameStatus, UndoRejected, UndoRejectReason
+from .errors import UndoRejected, UndoRejectReason
+from .values import GameStatus
 
 
 @dataclass(frozen=True)

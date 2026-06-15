@@ -1,13 +1,8 @@
 import pytest
 
+from app.domain.errors import MoveRejected, MoveRejectReason, UndoRejected, UndoRejectReason
 from app.domain.game import undo_truncate, validate_move
-from app.domain.values import (
-    Color,
-    MoveRejected,
-    MoveRejectReason,
-    UndoRejected,
-    UndoRejectReason,
-)
+from app.domain.values import Color
 
 
 def test_valid_move_passes():
