@@ -15,6 +15,7 @@ from ..domain.retention import Section, game_section
 from ..domain.rules import winning_line
 from ..domain.values import GameStatus, MoveRejected, UndoRejected
 from ..exceptions import BadInputError
+from ..game.controllers import engine_level_id, engine_level_tag, public_view, user_side
 from ..game.dtos import CreateGameBody, GameSummaryDTO, LevelDTO
 from ..game.repository import SqlGameRepository
 from ..game.service import GameService
@@ -75,40 +76,13 @@ def schedule_advance(app: FastAPI, game_id: str) -> None:
     task.add_done_callback(app.state.bg_tasks.discard)
 
 
-def _public_controllers(controllers: dict) -> dict:  # id чужого игрока не светим
-    return {
-        side: (
-            {"kind": "engine", "levelId": c["level_id"]}
-            if c["kind"] == "engine"
-            else {"kind": "user"}
-        )
-        for side, c in controllers.items()
-    }
-
-
-def _your_color(controllers: dict, user_id: int) -> str | None:
-    for side, c in controllers.items():
-        if c["kind"] == "user" and c["user_id"] == user_id:
-            return side
-    return None
-
-
-def _engine_level_id(controllers: dict) -> str | None:
-    """level_id engine-оппонента для summary; None если engine-стороны нет (или '-' нет смысла)."""
-    for c in controllers.values():
-        if c.get("kind") == "engine":
-            lid = c.get("level_id", "-")
-            return lid if lid != "-" else None
-    return None
-
-
 def _summary(game, user_id: int) -> GameSummaryDTO:
     return GameSummaryDTO(
         id=game.id,
         status=game.status,
         section=game_section(game.status, game.favorite).value,
-        level_id=_engine_level_id(game.controllers),
-        your_color=_your_color(game.controllers, user_id),
+        level_id=engine_level_id(game.controllers),
+        your_color=user_side(game.controllers, user_id),
         move_count=len(game.moves),
         # мини-доска карточки (rj-6ub); уже загружено для move_count. Без пагинации: список
         # завершённых растёт со временем, а на партию приедет весь moves (≤225 точек). Осознанно
@@ -131,8 +105,8 @@ def _state(game, user_id: int, hub) -> dict:
     return {
         "id": game.id,
         "owner_id": game.owner_id,
-        "controllers": _public_controllers(game.controllers),
-        "your_color": _your_color(game.controllers, user_id),
+        "controllers": public_view(game.controllers),
+        "your_color": user_side(game.controllers, user_id),
         "status": game.status,
         "moves": game.moves,
         "undo_count": game.undo_count,
@@ -288,14 +262,6 @@ async def undo(
     return _state(game, user.user_id, request.app.state.event_hub)
 
 
-def _engine_level_tag(controllers: dict) -> str:
-    """level_id engine-оппонента (для логов реестра); '-' если engine-стороны нет."""
-    for c in controllers.values():
-        if c.get("kind") == "engine":
-            return c["level_id"]
-    return "-"
-
-
 @router.post("/games/{game_id}/enter")
 async def enter(
     game_id: str,
@@ -307,7 +273,7 @@ async def enter(
     game = await _service(request, session).get_game(game_id, user.user_id)  # 404 если нет доступа
     adapter = request.app.state.adapter
     if adapter is not None:
-        await adapter.mark_present(game_id, _engine_level_tag(game.controllers))
+        await adapter.mark_present(game_id, engine_level_tag(game.controllers))
     return {"ok": True}
 
 

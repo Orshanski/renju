@@ -156,7 +156,7 @@ def engine_level_tag(controllers: dict) -> str:
 
 
 def user_side(controllers: dict, user_id: int) -> str | None:
-    """Сторона ('0'/'1'), которой управляет данный пользователь; None если его нет."""
+    """Сторона ('black'/'white'), которой управляет данный пользователь; None если его нет."""
     for side, c in controllers.items():
         ctl = controller_from_json(c)
         if isinstance(ctl, User) and ctl.user_id == user_id:
