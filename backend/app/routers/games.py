@@ -8,8 +8,9 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from ..auth import CurrentUser, decode_token, fetch_token_epoch, get_current_user
+from ..domain.errors import MoveRejected, UndoRejected
 from ..domain.retention import Section, game_section
-from ..domain.values import GameStatus, MoveRejected, UndoRejected
+from ..domain.values import GameStatus
 from ..exceptions import BadInputError
 from ..game.controllers import engine_level_tag
 from ..game.deps import build_game_service, make_game_service

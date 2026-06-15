@@ -2,6 +2,7 @@ import uuid
 from collections.abc import Sequence
 from datetime import UTC, datetime
 
+from ..domain.errors import MoveRejected, MoveRejectReason
 from ..domain.game import undo_truncate
 from ..domain.opening import CENTER
 from ..domain.retention import Evictable, Section, game_section, select_evictions
@@ -10,8 +11,6 @@ from ..domain.undo import UndoPolicy, check_undo
 from ..domain.values import (
     Color,
     GameStatus,
-    MoveRejected,
-    MoveRejectReason,
     Point,
     color_of_move,
     color_to_move,

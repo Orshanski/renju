@@ -2,15 +2,8 @@
 
 from collections.abc import Sequence
 
-from .values import (
-    BOARD_SIZE,
-    Color,
-    MoveRejected,
-    MoveRejectReason,
-    Point,
-    UndoRejected,
-    UndoRejectReason,
-)
+from .errors import MoveRejected, MoveRejectReason, UndoRejected, UndoRejectReason
+from .values import BOARD_SIZE, Color, Point
 
 
 def validate_move(*, moves: Sequence[Point], point: Point) -> None:

@@ -1,7 +1,8 @@
 import pytest
 
+from app.domain.errors import UndoRejected, UndoRejectReason
 from app.domain.undo import UndoPolicy, check_undo
-from app.domain.values import GameStatus, UndoRejected, UndoRejectReason
+from app.domain.values import GameStatus
 
 
 def policy(**kw) -> UndoPolicy:

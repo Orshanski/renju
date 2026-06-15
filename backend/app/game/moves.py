@@ -5,10 +5,11 @@
 from collections.abc import Sequence
 
 from ..domain.engine_params import EngineParams
+from ..domain.errors import MoveRejected, MoveRejectReason
 from ..domain.game import validate_move
 from ..domain.opening import CENTER, opening_zone
 from ..domain.rules import outcome_after
-from ..domain.values import MoveRejected, MoveRejectReason, Point
+from ..domain.values import Point
 
 
 def new_game() -> list[Point]:

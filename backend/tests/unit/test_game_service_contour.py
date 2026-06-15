@@ -145,7 +145,7 @@ async def test_submit_move_then_engine_replies_via_advance():
 async def test_submit_not_your_turn_pvp_form():
     import pytest
 
-    from app.domain.values import MoveRejected, MoveRejectReason
+    from app.domain.errors import MoveRejected, MoveRejectReason
     from app.models.game import Game
 
     svc = _svc()
