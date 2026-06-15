@@ -65,14 +65,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         app.state.event_hub = InMemoryEventHub()
         app.state.levels = {lv.id: lv for lv in load_levels(settings.levels_file)}  # id → LevelInfo
-        app.state.bg_tasks = set()  # ссылки на фоновые advance-задачи (иначе GC оборвёт)
-        app.state.advancing = set()  # game_id с активным фоновым advance (per-process дедуп)
+
+        from .game.advance_manager import AdvanceManager
+        from .game.deps import make_game_service
+
+        async def _advance_runner(game_id: str) -> None:
+            if app.state.adapter is None:  # E1: движок не собран — фон бессмыслен
+                logging.getLogger("renju.advance").warning(
+                    "schedule_advance: adapter=None, game=%s остаётся opponent_thinking", game_id
+                )
+                return
+            async with app.state.sessionmaker() as s:
+                svc = make_game_service(app, s)
+                game = await svc.load(game_id)
+                if game is not None:
+                    await svc.advance(game)
+
+        app.state.advance = AdvanceManager(_advance_runner)
         yield
-        bg = list(app.state.bg_tasks)  # снимок: done-callback мутирует set по мере завершения
-        for t in bg:  # погасить незавершённые фоновые advance И дождаться отмены до dispose
-            t.cancel()
-        if bg:
-            await asyncio.gather(*bg, return_exceptions=True)
+        await app.state.advance.aclose()  # ОТМЕНИТЬ незавершённые advance до dispose
         if app.state.engine_sweep is not None:  # гасим sweep ПОСЛЕ отмены advance
             app.state.engine_sweep.cancel()
             await asyncio.gather(app.state.engine_sweep, return_exceptions=True)
