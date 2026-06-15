@@ -95,6 +95,9 @@ class _FakeAdapter:
                 return tuple(c)
         raise AssertionError("board full")
 
+    async def sync_after_undo(self, game_id, moves, *, level_tag="-"):
+        pass
+
     async def mark_present(self, game_id, level_tag="-"):
         pass
 

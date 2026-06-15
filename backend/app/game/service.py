@@ -22,6 +22,8 @@ from ..models.game import Game
 from ..rapfi.adapter import EngineError
 from .controllers import Engine, User, controller_from_json, controller_to_json
 from .players import Player, make_player
+from .ports import EngineAdapter, EventHub
+from .repository import GameRepository
 from .settings_repository import SettingsRepository
 
 
@@ -41,7 +43,14 @@ def _now() -> datetime:
 
 
 class GameService:
-    def __init__(self, repo, hub, adapter, levels: dict, settings_repo: SettingsRepository):
+    def __init__(
+        self,
+        repo: GameRepository,
+        hub: EventHub,
+        adapter: EngineAdapter,
+        levels: dict,
+        settings_repo: SettingsRepository,
+    ):
         self._repo = repo
         self._hub = hub
         self._adapter = adapter
@@ -276,9 +285,7 @@ class GameService:
         )
         new_moves = undo_truncate(moves=[tuple(m) for m in game.moves], for_color=Color(my_side))
         k = len(new_moves)
-        sync_after_undo = getattr(self._adapter, "sync_after_undo", None)
-        if sync_after_undo is not None:
-            await sync_after_undo(game.id, new_moves, level_tag="-")
+        await self._adapter.sync_after_undo(game.id, new_moves, level_tag="-")
         game.moves = [list(p) for p in new_moves]
         game.forbidden_log = {key: v for key, v in game.forbidden_log.items() if int(key) <= k}
         game.undo_count += 1
