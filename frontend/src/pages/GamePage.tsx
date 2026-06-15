@@ -1,11 +1,9 @@
-import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Board } from "../components/board/Board";
-import { getLevels } from "../game/api";
 import { canPlay, canUndo, colorToMove, openingZone, pointLabel } from "../game/legality";
-import type { LevelDTO } from "../game/types";
 import type { GameView } from "../game/view";
 import { useGame } from "../game/useGame";
+import { useLevels } from "../game/useLevels";
 import styles from "./GamePage.module.css";
 
 const COLOR_RU = { black: "чёрными", white: "белыми" } as const;
@@ -29,16 +27,13 @@ export default function GamePage() {
   const { gameId } = useParams<{ gameId: string }>();
   const navigate = useNavigate();
   const { view, notice, play, undoMove, dismissNotice } = useGame(gameId!);
-  const [levels, setLevels] = useState<LevelDTO[]>([]);
-  useEffect(() => {
-    getLevels().then(setLevels).catch(() => {}); // имя уровня — украшение; ошибка не валит экран
-  }, []);
+  const { nameOf } = useLevels();
 
   if (!view) return <div className={styles.loading}>{notice ?? "Загрузка…"}</div>;
 
   const myTurn = view.status === "awaiting_move" && colorToMove(view.moves.length) === view.yourColor;
   const zone = myTurn ? openingZone(view.moves.length) : null; // рамка видна только когда ввод за человеком
-  const levelName = levels.find((l) => l.id === view.opponentLevelId)?.name ?? view.opponentLevelId ?? "—";
+  const levelName = nameOf(view.opponentLevelId) ?? view.opponentLevelId ?? "—";
   const toMove = colorToMove(view.moves.length);
 
   return (

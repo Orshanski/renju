@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getGamesSummary, getLevels } from "../game/api";
+import { getGamesSummary } from "../game/api";
 import type { GameSummaryDTO, Section } from "../game/types";
 import { GameCard } from "../components/GameCard";
+import { useLevels } from "../game/useLevels";
 import styles from "./HomePage.module.css";
 
 const TABS: { section: Section; label: string }[] = [
@@ -15,15 +16,8 @@ export default function HomePage() {
   const navigate = useNavigate();
   const [section, setSection] = useState<Section>("current");
   const [games, setGames] = useState<GameSummaryDTO[] | null>(null);
-  const [levelNames, setLevelNames] = useState<Map<string, string>>(new Map()); // id→имя для уровня-pill карточки
   const [reloadKey, setReloadKey] = useState(0); // bump → перезапрос текущего раздела после действия (favorite/delete)
-
-  useEffect(() => {
-    let alive = true;
-    // имена уровней — справочник для карточек; отказ не критичен (pill просто не покажется)
-    getLevels().then((ls) => alive && setLevelNames(new Map(ls.map((l) => [l.id, l.name])))).catch(() => {});
-    return () => { alive = false; };
-  }, []);
+  const { nameOf } = useLevels();
 
   useEffect(() => {
     let alive = true; // guard от гонки: ответ устаревшего раздела не перетирает свежий при быстром переключении табов
@@ -55,7 +49,7 @@ export default function HomePage() {
           <GameCard
             key={g.id}
             game={g}
-            levelName={g.level_id ? levelNames.get(g.level_id) : undefined}
+            levelName={nameOf(g.level_id)}
             onOpen={(id) => navigate(`/game/${id}`)}
             onChanged={() => setReloadKey((k) => k + 1)}
           />
