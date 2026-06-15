@@ -1,15 +1,14 @@
 """Фасад хода/партии: оркестрация поверх домена и адаптера Rapfi (§4.9).
 
-Прячет дебютную механику (allowed_zone) и проверку завершённости. Этап 1 — тонкий
-модуль; на этапе 2 дозреет до game-service с БД/статусами (тикет rj-8sc — очередь)."""
+Прячет дебютную механику (allowed_zone) и проверку завершённости."""
 
 from collections.abc import Sequence
 
-from .domain.engine_params import EngineParams
-from .domain.game import validate_move
-from .domain.opening import CENTER, opening_zone
-from .domain.rules import outcome_after
-from .domain.values import MoveRejected, MoveRejectReason, Point
+from ..domain.engine_params import EngineParams
+from ..domain.game import validate_move
+from ..domain.opening import CENTER, opening_zone
+from ..domain.rules import outcome_after
+from ..domain.values import MoveRejected, MoveRejectReason, Point
 
 
 def new_game() -> list[Point]:

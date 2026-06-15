@@ -3,8 +3,8 @@ from typing import Protocol
 
 from ..domain.engine_params import EngineParams
 from ..domain.values import Point
-from ..game_service import engine_move
 from .controllers import Controller, User
+from .moves import engine_move
 from .ports import EngineAdapter
 
 

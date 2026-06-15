@@ -17,10 +17,10 @@ from ..domain.values import (
     color_to_move,
 )
 from ..exceptions import ConflictError, NotFoundError
-from ..game_service import apply_move
 from ..models.game import Game
 from ..rapfi.adapter import EngineError
 from .controllers import Engine, User, controller_from_json, controller_to_json
+from .moves import apply_move
 from .players import Player, make_player
 from .ports import EngineAdapter, EventHub
 from .repository import GameRepository
