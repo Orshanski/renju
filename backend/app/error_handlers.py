@@ -8,6 +8,7 @@ from .exceptions import (
     ForbiddenError,
     NotFoundError,
     RateLimitError,
+    UnknownLevelError,
 )
 
 _MAP = [
@@ -17,6 +18,7 @@ _MAP = [
     (ForbiddenError, 403),
     (AuthError, 401),
     (RateLimitError, 429),
+    (UnknownLevelError, 422),
 ]
 
 

@@ -8,16 +8,6 @@ async def _login_admin(app, client, username="admin", password="pw"):
     await client.post("/api/auth/login", json={"username": username, "password": password})
 
 
-async def _login_user(app, client, username="bob", password="pw"):
-    from app.dal import users as dal
-
-    async with app.state.sessionmaker() as s:
-        if not await dal.get_user_by_username(s, username):
-            await dal.create_user(s, username, password, role="user")
-            await s.commit()
-    await client.post("/api/auth/login", json={"username": username, "password": password})
-
-
 async def test_get_engine_config_admin(app, client):
     """GET /api/admin/engine-config — 200, отдаёт levels + nnue."""
     await _login_admin(app, client)
@@ -68,6 +58,17 @@ async def test_put_engine_config_updates(app, client):
     novice2 = next(lv for lv in d2["levels"] if lv["id"] == "novice")
     assert novice2["strength"] == 3
     assert novice2["timeout_ms"] == 800
+
+
+async def test_put_empty_levels_changes_only_nnue(app, client):
+    """PUT с levels:[] меняет только глобальный nnue (уровни не трогает), GET отражает."""
+    await _login_admin(app, client)
+    r = await client.put("/api/admin/engine-config", json={"levels": [], "nnue": False})
+    assert r.status_code == 200
+    assert r.json()["nnue"] is False
+    d = (await client.get("/api/admin/engine-config")).json()
+    assert d["nnue"] is False  # nnue сохранён
+    assert len(d["levels"]) == 7  # уровни на месте, не тронуты
 
 
 async def test_get_engine_config_non_admin_403(app, client):

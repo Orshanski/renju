@@ -1,11 +1,11 @@
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..auth import CurrentUser, require_admin
-from ..config_repository import ConfigRepository, UnknownLevelError
+from ..config_repository import ConfigRepository
 from ..db.deps import get_session
 from ..dtos.auth import UserDTO
 from ..dtos.engine_config import EngineConfigBody, EngineConfigDTO, LevelConfigDTO
@@ -95,12 +95,8 @@ async def put_engine_config(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> EngineConfigDTO:
     repo = ConfigRepository(session)
-    try:
-        await repo.update(body.levels, body.nnue)
-    except UnknownLevelError as exc:
-        raise HTTPException(
-            status_code=422, detail=f"Unknown level ids: {exc.unknown_ids}"
-        ) from exc
+    # неизвестный level_id → UnknownLevelError → 422 (см. error_handlers._MAP)
+    await repo.update(body.levels, body.nnue)
     await session.commit()
     levels = await repo.levels()
     return _build_engine_config_dto(levels, await repo.nnue())
