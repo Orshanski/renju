@@ -1,7 +1,7 @@
 /* Гобан по prototype/index.html §GAME (.goban и слои); наши дополнения: рамка
    дебютной зоны и метки выигрышной линии (реестр отличий — в спеке среза).
    Текстура: board_pine.webp (1280²) — Vecteezy free license, атрибуция на странице игры. */
-@value lineInk, vermillion, shadow, fontSerif from "../../styles/tokens.module.css";
+@value vermillion, vermillionDeep, shadow, fontSerif from "../../styles/tokens.module.css";
 
 .goban {
   position: relative;
@@ -26,10 +26,10 @@
 }
 .hoshi {
   position: absolute;
-  width: 1.1824%;
-  height: 1.1824%;
+  width: 1.7%;
+  height: 1.7%;
   border-radius: 50%;
-  background: rgba(40, 28, 14, 0.7);
+  background: vermillionDeep;
   transform: translate(-50%, -50%);
   z-index: 2;
 }

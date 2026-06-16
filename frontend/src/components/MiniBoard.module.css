@@ -1,6 +1,6 @@
 /* Миниатюра доски карточки — облегчённый слепок prototype/index.html §GAME (.goban),
    сетка 14-делений как у настоящей доски (камни ложатся на пересечения). Токены — @value. */
-@value lineInk, vermillion from "../styles/tokens.module.css";
+@value vermillion, vermillionDeep from "../styles/tokens.module.css";
 
 .mini {
   position: relative;
@@ -17,10 +17,10 @@
 }
 .hoshi {
   position: absolute;
-  width: 1.4%;
-  height: 1.4%;
+  width: 2%;
+  height: 2%;
   border-radius: 50%;
-  background: rgba(40, 28, 14, 0.6);
+  background: vermillionDeep;
   transform: translate(-50%, -50%);
 }
 .stone {
