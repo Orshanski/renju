@@ -160,6 +160,7 @@ def test_backfill_unresolvable_level_uses_novice(tmp_path, monkeypatch):
         row = conn.execute(text("SELECT controllers FROM games WHERE id='g2'")).fetchone()
     eng2.dispose()
 
+    assert row is not None
     ctl_after = json.loads(row[0])
     white_ctl = ctl_after["white"]
     # Неизвестный/'-' уровень заморожен конфигом новичка (через существующий засеянный конфиг)

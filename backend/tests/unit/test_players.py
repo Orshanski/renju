@@ -16,7 +16,10 @@ async def test_interactive_player_take_turn_none():
 
 
 async def test_make_player_dispatch():
-    fake_adapter = object()
+    from typing import cast
+    from app.game.ports import EngineAdapter
+
+    fake_adapter = cast(EngineAdapter, object())
     assert isinstance(make_player(User(7), fake_adapter, "g"), InteractivePlayer)
     assert isinstance(make_player(_MASTER, fake_adapter, "g"), EnginePlayer)
 
@@ -31,6 +34,12 @@ async def test_engine_player_passes_game_id():
             captured["game_id"] = game_id
             captured["level_tag"] = level_tag
             return (7, 8)
+
+        async def forbidden_points(self, game_id, moves, *, level_tag="-", nnue=None):
+            return []
+
+        async def sync_after_undo(self, game_id, moves, *, level_tag="-"):
+            pass
 
     p = make_player(_NOVICE, FakeReg(), "game-77")
     assert await p.take_turn([(7, 7)]) == (7, 8)

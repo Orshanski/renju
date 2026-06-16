@@ -1,5 +1,6 @@
 import asyncio
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -60,7 +61,7 @@ def make_registry(spawn, *, tmp_path: Path | None = None, **kw):
     config_file = data_dir / "config.toml"
     if not config_file.exists():
         config_file.write_text(_BASE_TOML)
-    d = dict(
+    d: dict[str, Any] = dict(
         bin_path="/x",
         config_path=config_file,
         cwd="/z",

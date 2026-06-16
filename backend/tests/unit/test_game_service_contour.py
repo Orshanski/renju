@@ -1,3 +1,5 @@
+from typing import cast
+
 from app.game.controllers import Engine
 from app.game.event_hub import InMemoryEventHub
 from app.game.repository import InMemoryGameRepository
@@ -18,9 +20,10 @@ _MASTER_JSON = {
 
 class FakeAdapter:
     def __init__(self):
-        self.forbid = [(3, 3)]
-        self.move = (8, 8)
-        self.undo_syncs = []
+        self.forbid: list[tuple[int, int]] = [(3, 3)]
+        self.move: tuple[int, int] = (8, 8)
+        self.undo_syncs: list = []
+        self.calls: int = 0
 
     async def forbidden_points(self, game_id, moves, *, level_tag="-", nnue=None):
         return list(self.forbid)
@@ -43,6 +46,10 @@ def _svc(adapter=None, settings_repo=None):
     )
 
 
+def _fake(svc: GameService) -> FakeAdapter:
+    return cast(FakeAdapter, svc._adapter)
+
+
 async def _create_game(svc, owner_id=1, human_color="black"):
     """Хелпер: create_game с замороженным _MASTER-снимком."""
     return await svc.create_game(owner_id=owner_id, engine_ctl=_MASTER, human_color=human_color)
@@ -50,11 +57,12 @@ async def _create_game(svc, owner_id=1, human_color="black"):
 
 async def test_fouls_memoized_one_engine_call():
     svc = _svc()
-    svc._adapter.calls = 0
+    fake = _fake(svc)
+    fake.calls = 0
     orig = svc._adapter.forbidden_points
 
     async def counting(game_id, moves, *, level_tag="-", nnue=None):
-        svc._adapter.calls += 1
+        fake.calls += 1
         return await orig(game_id, moves, level_tag=level_tag)
 
     svc._adapter.forbidden_points = counting
@@ -71,13 +79,12 @@ async def test_fouls_memoized_one_engine_call():
     )
     f1 = await svc.fouls(g, g.moves)  # len 2 (чёрные) → движок, запись
     f2 = await svc.fouls(g, g.moves)  # из лога
-    assert f1 == [(3, 3)] and f2 == [(3, 3)] and svc._adapter.calls == 1
+    assert f1 == [(3, 3)] and f2 == [(3, 3)] and fake.calls == 1
     assert g.forbidden_log["2"] == [[3, 3]]
 
 
 async def test_fouls_white_to_move_empty_no_engine():
     svc = _svc()
-    svc._adapter.calls = 0
     from app.models.game import Game
 
     g = Game(
@@ -142,18 +149,18 @@ async def test_advance_engine_error_publishes_error_event():
     async def boom(game_id, moves, params, allowed_zone=None, *, level_tag="-", nnue=None):
         raise EngineError("twice")
 
-    svc._adapter.compute_move = boom
+    setattr(svc._adapter, 'compute_move', boom)
     g = await _create_game(svc, owner_id=1, human_color="black")
     assert g.status == "opponent_thinking"
     await svc.advance(g)  # движок падает → error-событие, статус НЕ меняется (§4.8 доиграет позже)
     assert g.status == "opponent_thinking"
-    assert any(e["type"] == "error" for e in svc._hub._log.get(g.id, []))
+    assert any(e["type"] == "error" for e in cast(InMemoryEventHub, svc._hub)._log.get(g.id, []))
 
 
 async def test_submit_move_then_engine_replies_via_advance():
     svc = _svc()
     g = await _create_game(svc, owner_id=1, human_color="white")
-    svc._adapter.move = (5, 5)
+    _fake(svc).move = (5, 5)
     g = await svc.submit_move(g.id, user_id=1, point=(6, 6))  # ход 2 белые (человек)
     assert g.moves == [[7, 7], [6, 6]] and g.status == "opponent_thinking"  # ждём движок
     await svc.advance(g)  # «фон»: движок-чёрный ходит 3-м
@@ -199,25 +206,26 @@ async def test_submit_foreign_user_not_found():
 
 async def test_undo_pure_replay_no_engine():
     svc = _svc()
+    fake = _fake(svc)
     g = await _create_game(svc, owner_id=1, human_color="white")
-    svc._adapter.move = (6, 6)
+    fake.move = (6, 6)
     g = await svc.submit_move(g.id, user_id=1, point=(8, 8))  # ход 2 белые (реальный ход человека)
     await svc.advance(g)  # «фон»: движок-чёрный ходит 3-м → [[7,7],[8,8],[6,6]]
     assert g.moves == [[7, 7], [8, 8], [6, 6]]
     # форбиды позиций уже в forbidden_log → undo без движка
-    svc._adapter.calls = 0
+    fake.calls = 0
     orig = svc._adapter.forbidden_points
 
-    async def counting(game_id, m, **kw):
-        svc._adapter.calls += 1
-        return await orig(game_id, m)
+    async def counting(game_id, moves, **kw):
+        fake.calls += 1
+        return await orig(game_id, moves)
 
     svc._adapter.forbidden_points = counting
     g = await svc.undo(g.id, user_id=1)
     # откат белых: снимаем ход 3 (движок) и ход 2 (человек) → назад к [[7,7]]
     assert g.moves == [[7, 7]] and "2" not in g.forbidden_log and "3" not in g.forbidden_log
-    assert svc._adapter.calls == 0  # undo без движка
-    assert svc._adapter.undo_syncs == [(g.id, [(7, 7)], "-")]
+    assert fake.calls == 0  # undo без движка
+    assert fake.undo_syncs == [(g.id, [(7, 7)], "-")]
 
 
 async def test_advance_recovers_and_is_idempotent():
@@ -240,17 +248,18 @@ async def test_advance_recovery_when_engine_move_already_applied():
     await svc.advance(g)  # движок сходил → [[7,7],[8,8]], awaiting_move (ход человека-чёрного)
     g.status = "opponent_thinking"
     await svc._repo.update(g)  # симулируем застрявший статус
-    svc._adapter.calls = 0
+    fake = _fake(svc)
+    fake.calls = 0
     orig = svc._adapter.compute_move
 
     async def counting(*a, **k):
-        svc._adapter.calls += 1
+        fake.calls += 1
         return await orig(*a, **k)
 
-    svc._adapter.compute_move = counting
+    setattr(svc._adapter, 'compute_move', counting)
     await svc.advance(g)  # позиция = ход человека → advance оседает на awaiting_move без движка
     assert g.moves == [[7, 7], [8, 8]] and g.status == "awaiting_move"
-    assert svc._adapter.calls == 0  # движок НЕ дёрнут — ход не задвоен
+    assert fake.calls == 0  # движок НЕ дёрнут — ход не задвоен
 
 
 async def test_get_game_pure_access_check():
@@ -275,12 +284,13 @@ async def test_undo_no_engine_even_with_sparse_log():
     from app.models.game import Game
 
     svc = _svc()
-    svc._adapter.calls = 0
+    fake = _fake(svc)
+    fake.calls = 0
     orig = svc._adapter.forbidden_points
 
-    async def counting(game_id, m, **kw):
-        svc._adapter.calls += 1
-        return await orig(game_id, m)
+    async def counting(game_id, moves, **kw):
+        fake.calls += 1
+        return await orig(game_id, moves)
 
     svc._adapter.forbidden_points = counting
     g = Game(
@@ -297,18 +307,19 @@ async def test_undo_no_engine_even_with_sparse_log():
     )
     await svc._repo.create(g)
     g2 = await svc.undo("g", user_id=1)  # откат чёрного: len4 → new_moves len2 (чёрная позиция)
-    assert g2.moves == [[7, 7], [8, 8]] and svc._adapter.calls == 0
+    assert g2.moves == [[7, 7], [8, 8]] and fake.calls == 0
 
 
 async def test_advance_engine_black_does_not_query_fouls():
     from app.models.game import Game
 
     svc = _svc()
-    svc._adapter.calls = 0
+    fake = _fake(svc)
+    fake.calls = 0
     orig = svc._adapter.forbidden_points
 
     async def counting(game_id, moves, *, level_tag="-", nnue=None):
-        svc._adapter.calls += 1
+        fake.calls += 1
         return await orig(game_id, moves, level_tag=level_tag)
 
     svc._adapter.forbidden_points = counting
@@ -326,7 +337,7 @@ async def test_advance_engine_black_does_not_query_fouls():
     )
     await svc._repo.create(g)
     await svc.advance(g)  # движок-чёрный ходит 3-м; фолы для него НЕ запрашиваются
-    assert svc._adapter.calls == 0
+    assert fake.calls == 0
 
 
 async def test_eve_advance_drives_both_engine_sides():
@@ -434,7 +445,7 @@ async def test_finish_sets_finished_at_and_evicts_over_limit():
     await svc._repo.create(g_older)
 
     # Доигрываем 3-ю через advance: движок-чёрный делает победный ход (11,11)
-    svc._adapter.move = (11, 11)
+    _fake(svc).move = (11, 11)
     g_new = Game(
         id="new1",
         owner_id=1,

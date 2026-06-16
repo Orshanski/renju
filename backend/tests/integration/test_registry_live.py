@@ -77,6 +77,7 @@ async def test_warm_takeback_mechanics(rapfi_paths):
         # Шаг 1: cold с одним ходом
         mv_cold = await reg.compute_move("g", [(7, 7)], P)
         pid_before = reg._slots["g"].pid
+        assert reg._slots["g"].synced is not None
         synced_after_cold = list(reg._slots["g"].synced)
         assert synced_after_cold == [(7, 7), mv_cold]
 
@@ -294,6 +295,7 @@ async def test_recovers_after_engine_crash(rapfi_paths):
         await reg.compute_move("g", [], FAST)
         # имитируем внешний крах: завершаем процесс движка напрямую
         slot = reg._slots["g"]
+        assert slot.proc is not None
         await slot.proc.terminate(grace_s=0.1)
         # respawn + повтор должны произойти внутри следующего запроса
         move = await reg.compute_move("g", [(7, 7)], FAST)
@@ -352,9 +354,11 @@ async def test_compute_move_in_3x3_zone(rapfi_paths):
     from app.domain.opening import opening_zone
 
     reg = _reg(rapfi_paths)
+    zone1 = opening_zone(1)
+    assert zone1 is not None
     try:
-        move = await reg.compute_move("g", [(7, 7)], FAST, allowed_zone=opening_zone(1))
-        assert move in opening_zone(1)
+        move = await reg.compute_move("g", [(7, 7)], FAST, allowed_zone=zone1)
+        assert move in zone1
         assert move != (7, 7)
     finally:
         await reg.close()
@@ -365,9 +369,11 @@ async def test_compute_move_in_5x5_zone(rapfi_paths):
     from app.domain.opening import opening_zone
 
     reg = _reg(rapfi_paths)
+    zone2 = opening_zone(2)
+    assert zone2 is not None
     try:
-        move = await reg.compute_move("g", [(7, 7), (8, 8)], FAST, allowed_zone=opening_zone(2))
-        assert move in opening_zone(2)
+        move = await reg.compute_move("g", [(7, 7), (8, 8)], FAST, allowed_zone=zone2)
+        assert move in zone2
         assert move not in {(7, 7), (8, 8)}
     finally:
         await reg.close()
