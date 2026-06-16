@@ -79,16 +79,18 @@ def upgrade() -> None:
         game_id = row[0]
         controllers = json.loads(row[1])
         changed = False
-        for side, ctl in controllers.items():
+        for ctl in controllers.values():
             if ctl.get("kind") != "engine":
                 continue
-            level_id = ctl.get("level_id", "-")
-            if level_id == "-" or level_id not in _levels_map:
-                continue  # плейсхолдер или неизвестный уровень — пропустить
             if "strength" in ctl and "timeout_ms" in ctl and "nnue" in ctl:
                 continue  # уже заморожен
-            ctl["strength"] = _levels_map[level_id]["strength"]
-            ctl["timeout_ms"] = _levels_map[level_id]["timeout_ms"]
+            # Неизвестный уровень / плейсхолдер "-" → конфиг НОВИЧКА (через существующий
+            # засеянный конфиг, не отдельный хардкод): партия не остаётся без снимка,
+            # иначе строгий controller_from_json уронил бы даже список партий.
+            level_id = ctl.get("level_id", "-")
+            src = level_id if level_id in _levels_map else "novice"
+            ctl["strength"] = _levels_map[src]["strength"]
+            ctl["timeout_ms"] = _levels_map[src]["timeout_ms"]
             ctl["nnue"] = _nnue
             changed = True
         if changed:

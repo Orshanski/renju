@@ -114,8 +114,9 @@ def test_backfill_frozen_engine_config(tmp_path, monkeypatch):
     assert white_ctl["nnue"] is True
 
 
-def test_backfill_skips_placeholder_level(tmp_path, monkeypatch):
-    """engine_config-миграция НЕ падает на engine с level_id='-'."""
+def test_backfill_unresolvable_level_uses_novice(tmp_path, monkeypatch):
+    """engine с неизвестным/'-' уровнем → конфиг НОВИЧКА (через засеянный конфиг), а не
+    пропуск: партия не остаётся без снимка, иначе строгий загрузчик уронил бы список."""
     monkeypatch.setenv("RENJU_DATA_DIR", str(tmp_path))
 
     r = subprocess.run(
@@ -161,6 +162,8 @@ def test_backfill_skips_placeholder_level(tmp_path, monkeypatch):
 
     ctl_after = json.loads(row[0])
     white_ctl = ctl_after["white"]
-    # Плейсхолдер не трогаем — frozen-полей нет
-    assert "strength" not in white_ctl
-    assert "nnue" not in white_ctl
+    # Неизвестный/'-' уровень заморожен конфигом новичка (через существующий засеянный конфиг)
+    assert white_ctl["strength"] == 5  # novice
+    assert white_ctl["timeout_ms"] == 1000  # novice
+    assert white_ctl["nnue"] is True
+    assert white_ctl["level_id"] == "-"  # сам level_id не переписываем
