@@ -359,13 +359,13 @@ class EngineRegistry:
                 self._slots.pop(game_id, None)
                 slot.ready.set()
                 self._cond.notify_all()
-            # Спавн упал: слот изъят и до _terminate не дойдёт. Если МЫ собрали файл
-            # в этот заход — убрать, иначе он осиротеет (на устойчивом сбое — вечная утечка).
-            if slot.config_path is not None:
-                remove_engine_config(game_id, self._data_dir)
+                # Спавн упал: слот изъят и до _terminate не дойдёт. Если МЫ собрали файл
+                # в этот заход — убрать ПОД ЛОКОМ (атомарно с pop, без окна гонки), иначе он
+                # осиротеет (на устойчивом сбое — вечная утечка).
+                if slot.config_path is not None:
+                    remove_engine_config(game_id, self._data_dir)
             raise
         orphan = None
-        drop_file = False
         async with self._cond:
             if self._closing or self._slots.get(game_id) is not slot:
                 orphan = proc  # реестр закрыт/слот изъят за время spawn
@@ -373,11 +373,14 @@ class EngineRegistry:
                 slot.ready.set()
                 self._cond.notify_all()
                 # Слот не получит proc → close() его пропустит (гейт `if s.proc`), а _terminate
-                # не вызовется. Убираем собранный файл сами — НО только если его не перехватил
-                # НОВЫЙ слот того же game_id (recreate владеет тем же именем и уберёт сам).
-                drop_file = slot.config_path is not None and (
+                # не вызовется. Убираем собранный файл ПОД ЛОКОМ (снимок _slots атомарен с unlink),
+                # но только если его не перехватил НОВЫЙ слот того же game_id (recreate владеет тем
+                # же именем и уберёт сам). КРИТИЧНО под локом, а НЕ после `await terminate` ниже:
+                # иначе recreate в окне await успел бы записать файл, и мы снесли бы ЖИВОЙ конфиг.
+                if slot.config_path is not None and (
                     self._closing or self._slots.get(game_id) is None
-                )
+                ):
+                    remove_engine_config(game_id, self._data_dir)
             else:
                 slot.proc, slot.pid = proc, proc.pid
                 slot.synced = None  # свежий процесс — состояние движка неизвестно
@@ -385,8 +388,6 @@ class EngineRegistry:
                 _log.info("spawn game=%s pid=%s level_tag=%s", game_id, proc.pid, slot.level_tag)
         if orphan is not None:
             await orphan.terminate(grace_s=self._grace)
-            if drop_file:
-                remove_engine_config(game_id, self._data_dir)
             raise EngineError("slot evicted during spawn (registry closing or recreated)")
 
     async def _unclaim(self, slot: EngineSlot, counter: str) -> None:

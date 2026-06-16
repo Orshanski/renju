@@ -677,8 +677,29 @@ async def test_spawn_failure_removes_assembled_config(tmp_path):
 
     reg = make_registry(spawn, tmp_path=tmp_path)
     per_game = tmp_path / "engine_configs" / "game-fail.toml"
-    with pytest.raises(Exception):  # noqa: B017 — нам важен сам факт провала, не тип
+    with pytest.raises(OSError):
         await reg.compute_move("game-fail", [(7, 7)], P, nnue=True)
     assert not per_game.exists(), "осиротевший per-game config после провала спавна"
     assert "game-fail" not in reg._slots
+    await reg.close()
+
+
+@pytest.mark.asyncio
+async def test_spawn_orphaned_during_close_removes_config(tmp_path):
+    """Слот осиротел во время спавна (close()/eviction → orphan-ветка): собранный файл
+    не должен утечь. Удаление под локом orphan-ветки (close() пропустил бы слот с proc=None)."""
+    from app.rapfi.adapter import EngineError
+
+    holder: dict = {}
+
+    async def spawn(*, bin_path, config_path, cwd, **kw):
+        holder["reg"]._closing = True  # имитируем close() во время спавна → orphan-ветка
+        return FakeProc([])
+
+    reg = make_registry(spawn, tmp_path=tmp_path)
+    holder["reg"] = reg
+    per_game = tmp_path / "engine_configs" / "game-orphan.toml"
+    with pytest.raises(EngineError):
+        await reg.compute_move("game-orphan", [(7, 7)], P, nnue=True)
+    assert not per_game.exists(), "осиротевший per-game config после eviction во время спавна"
     await reg.close()
