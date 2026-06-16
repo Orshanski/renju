@@ -38,6 +38,9 @@ export function Shell() {
           {/* ?. — гейт ProtectedRoute гарантирует user; страховка, не флоу */}
           <span className={styles.av}>{user?.username.charAt(0).toUpperCase()}</span>
           <span>{user?.username}</span>
+          {user?.role === "admin" && (
+            <button className={styles.linkbtn} onClick={() => navigate("/admin")}>Админ</button>
+          )}
           <button className={styles.linkbtn} onClick={onLogout}>выйти</button>
         </div>
       </header>
