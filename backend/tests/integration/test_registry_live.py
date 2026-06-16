@@ -17,6 +17,27 @@ def _reg(rapfi_paths):
     return EngineRegistry(bin_path=b, config_path=c, cwd=cwd, idle_timeout_s=100.0)
 
 
+_DIRS = [(1, 0), (0, 1), (1, 1), (1, -1)]
+
+
+def _made_five(stones: set[tuple[int, int]], last: tuple[int, int], *, exactly: bool) -> bool:
+    """5 в ряд через last (та же геометрия, что в scripts/engine_probes). exactly=True
+    (чёрные): ровно 5 — оверлайн не победа; иначе ≥5 (белые)."""
+    for dx, dy in _DIRS:
+        count = 1
+        x, y = last
+        while (x + dx, y + dy) in stones:
+            count += 1
+            x, y = x + dx, y + dy
+        x, y = last
+        while (x - dx, y - dy) in stones:
+            count += 1
+            x, y = x - dx, y - dy
+        if (count == 5) if exactly else (count >= 5):
+            return True
+    return False
+
+
 async def test_distinct_games_distinct_pids(rapfi_paths):
     reg = _reg(rapfi_paths)
     try:
@@ -25,17 +46,6 @@ async def test_distinct_games_distinct_pids(rapfi_paths):
         # разные партии → разные процессы
         assert reg._slots["game-a"].pid != reg._slots["game-b"].pid
         await reg.compute_move("game-a", [(7, 7), (8, 8)], P)  # та же партия — тот же процесс
-    finally:
-        await reg.close()
-
-
-async def test_engine_blocks_winning_four(rapfi_paths):
-    """rj-t95-регрессия: на СВЕЖЕМ процессе движок закрывает открытую четвёрку белых."""
-    reg = _reg(rapfi_paths)
-    moves = [(7, 7), (8, 7), (8, 6), (9, 7), (6, 8), (9, 5), (9, 8), (10, 7), (7, 8), (11, 7)]
-    try:
-        mv = await reg.compute_move("g", moves, EngineParams(strength=5, timeout_turn_ms=1500))
-        assert mv == (12, 7)
     finally:
         await reg.close()
 
@@ -86,82 +96,116 @@ async def test_warm_takeback_mechanics(rapfi_paths):
         await reg.close()
 
 
-async def test_warm_forced_block_after_detour(rapfi_paths):
-    """rj-t95: после warm-детура движок не зевает открытую четвёрку белых (anti-зевок (12,7)).
+async def test_engine_white_holds_line_through_zone_and_undo(rapfi_paths):
+    """Наше вождение (зона 3×3 + откат + повтор) не разваливает движок: движок-белый
+    по-прежнему перехватывает простую чёрную линию.
 
-    forcing = [(7,7),(8,7),(8,6),(9,7),(6,8),(9,5),(9,8),(10,7),(7,8),(11,7)]
-
-    Построение warm-детура (strength=5, timeout=1500ms):
-      Шаг 1: cold forcing[:8] — живой движок стабильно отвечает (7,8) = forcing[8].
-        synced = forcing[:8] + [(7,8)] = forcing[:9].
-      Шаг 2: target = forcing = forcing[:9] + [(11,7)].
-        plan_sync: prefix=9, tail=[(11,7)], takebacks=() → WARM (TURN (11,7) без TAKEBACK).
-      Финальный ассерт: движок ОБЯЗАН закрыть открытую горизонтальную четвёрку белых → (12,7).
-
-    Детур доказывает, что warm-путь к критической позиции не вызывает тактического зевка.
+    Перенос raw-пробы scripts/engine_probes/probe_black_line_zone_undo_raw.py на наш
+    серверный путь (EngineRegistry: compute_move + allowed_zone + sync_after_undo).
+    Проверяем СВОЙСТВО — чёрные не собрали пять (по геометрии made_five), а НЕ конкретный
+    ход движка: его недетерминированную силу мы не тестируем. На этой тривиальной линии
+    raw-проба держала 100/100 — значит провал тут = поломка нашего вождения, не движка.
     """
-    forcing = [(7, 7), (8, 7), (8, 6), (9, 7), (6, 8), (9, 5), (9, 8), (10, 7), (7, 8), (11, 7)]
-    fast = EngineParams(strength=5, timeout_turn_ms=1500)
+    from app.domain.opening import opening_zone
+
+    line = [(7, 7), (8, 7), (9, 7), (10, 7), (11, 7)]  # человек ЧЁРНЫМИ тянет прямую
+    params = EngineParams(strength=15, timeout_turn_ms=1000)
+    zone = opening_zone(1)  # 3×3 на 1-й ход белых (RIF) — как YXBLOCK в пробе
     reg = _reg(rapfi_paths)
     try:
-        # Шаг 1: cold на forcing[:8] → движок стабильно играет (7,8) = forcing[8]
-        # → synced = forcing[:9]
-        mv_interim = await reg.compute_move("g", forcing[:8], fast)
-        synced_after_cold = list(reg._slots["g"].synced)
+        # Фаза 1: построить до тройки чёрных; движок-белый отвечает (зона на 1-й ответ)
+        moves: list[tuple[int, int]] = []
+        for i, b in enumerate(line[:3]):
+            if b in set(moves):  # движок занял клетку линии — дальше не строим
+                break
+            moves.append(b)
+            e = await reg.compute_move("g", moves, params, zone if i == 0 else None)
+            moves.append(e)
 
-        # Шаг 2: plan_sync проверяем вручную — если synced = forcing[:9], путь к forcing WARM
-        plan = plan_sync(synced_after_cold, forcing)
-        if not plan.cold:
-            # WARM-путь: доказываем что TAKEBACK/TURN к позиции forcing отрабатывает корректно
-            assert plan.turn == (11, 7), f"неверный TURN в warm-плане: {plan.turn}"
+        # Фаза 2+3: откат до пустой доски + YXHASHCLEAR (наш sync_after_undo)
+        await reg.sync_after_undo("g", [])
+        assert reg._slots["g"].synced == []
 
-        # Итоговый запрос: в любом случае (warm или cold) ассерт на (12,7) обязателен
-        mv_final = await reg.compute_move("g", forcing, fast)
-        assert mv_final == (12, 7), (
-            f"движок зевнул открытую четвёрку белых: сыграл {mv_final} "
-            f"(путь был {'warm' if not plan.cold else 'cold'}, mv_interim={mv_interim})"
+        # Фаза 4: заново вся линия; перехват движка-белого — по геометрии
+        moves = []
+        black: set[tuple[int, int]] = set()
+        white: set[tuple[int, int]] = set()
+        conceded = False
+        for i, b in enumerate(line):
+            if b in white:  # движок-белый занял клетку линии → перехватил
+                break
+            black.add(b)
+            moves.append(b)
+            if _made_five(black, b, exactly=True):  # чёрные собрали 5 → движок СЛИЛ
+                conceded = True
+                break
+            if i < len(line) - 1:
+                e = await reg.compute_move("g", moves, params, zone if i == 0 else None)
+                white.add(e)
+                moves.append(e)
+                if _made_five(white, e, exactly=False):  # белые сами собрали 5 → тоже перехват
+                    break
+        assert not conceded, (
+            f"движок-белый слил тривиальную чёрную линию (поломка вождения?): {moves}"
         )
-        assert reg._slots["g"].synced == [*forcing, (12, 7)]
+        assert reg._slots["g"].synced == moves  # вождение держит synced точно
     finally:
         await reg.close()
 
 
-async def test_warm_forbid_no_reset(rapfi_paths):
-    """rj-t95: warm-запрос YXSHOWFORBID не сбрасывает synced и не меняет pid.
+async def test_engine_black_holds_line_through_undo(rapfi_paths):
+    """Наше вождение (откат + повтор) не разваливает движок: движок-чёрный по-прежнему
+    перехватывает простую белую линию.
 
-    Позиция (7 ходов, движок-белый, strength=5, timeout=1000ms):
-      dbl3_moves — чёрные строят двойную тройку на (7,7):
-        (5,7),(6,7) горизонтально и (7,5),(7,6) вертикально; белые нейтральны в (0,1-3).
-    Наблюдаемые значения (стабильны 10/10 прогонов):
-      движок-белый отвечает (0,4); synced = dbl3_moves+[(0,4)] (8 элементов, чётное).
-    Warm-форбид: _attempt_forbid видит slot.synced == target → шлёт только YXSHOWFORBID.
-    Ожидаем: (7,7) в forbidden (двойная тройка), synced неизменён, pid неизменён.
+    Перенос raw-пробы scripts/engine_probes/probe_undo_raw.py на наш серверный путь
+    (EngineRegistry: compute_move + sync_after_undo). Свойство по геометрии (белые не
+    собрали пять), а не конкретный ход движка. Зоны нет — чёрного движка мы не обуздываем.
     """
-    # 7 ходов (нечётное) → движок ходит белым (8-й) → synced из 8 элементов (чётное)
-    # → forbidden_points не блокируется по гейту len(moves) % 2 != 0
-    dbl3_moves = [
-        (5, 7),
-        (0, 1),  # B W
-        (6, 7),
-        (0, 2),  # B W
-        (7, 5),
-        (0, 3),  # B W
-        (7, 6),  # B (7-й ход, чёрный)
-    ]
+    line = [(8, 7), (9, 7), (10, 7), (11, 7), (12, 7)]  # человек БЕЛЫМИ тянет прямую
+    params = EngineParams(strength=15, timeout_turn_ms=1000)
     reg = _reg(rapfi_paths)
     try:
-        mv = await reg.compute_move("g", dbl3_moves, P)
-        assert mv == (0, 4), f"ход движка-белого изменился: {mv}"
-        synced_before = list(reg._slots["g"].synced)
-        assert len(synced_before) == 8, "synced должен быть чётной длины для warm-форбида"
-        pid_before = reg._slots["g"].pid
+        # движок-чёрный ставит первый ход сам (свободно, как BEGIN в пробе)
+        e1 = await reg.compute_move("g", [], params)
+        moves: list[tuple[int, int]] = [e1]
+        black: set[tuple[int, int]] = {e1}
 
-        # warm-форбид: target == slot.synced → _attempt_forbid шлёт только YXSHOWFORBID
-        fb = await reg.forbidden_points("g", synced_before)
+        # Фаза 1: построить до тройки белых; движок-чёрный отвечает
+        for w in line[:3]:
+            if w in black:  # движок занял клетку линии до отката — мимо цели, не падаем
+                break
+            moves.append(w)
+            e = await reg.compute_move("g", moves, params)
+            black.add(e)
+            moves.append(e)
 
-        assert (7, 7) in fb, f"(7,7) должна быть запрещена (двойная тройка), получили: {fb}"
-        assert reg._slots["g"].synced == synced_before, "warm-форбид сбросил synced"
-        assert reg._slots["g"].pid == pid_before, "pid сменился после warm-форбида"
+        # Фаза 2+3: откат до первого хода + YXHASHCLEAR (наш sync_after_undo)
+        await reg.sync_after_undo("g", [e1])
+        assert reg._slots["g"].synced == [e1]
+
+        # Фаза 4: заново вся белая линия; перехват движка-чёрного — по геометрии
+        moves = [e1]
+        black = {e1}
+        white: set[tuple[int, int]] = set()
+        conceded = False
+        for i, w in enumerate(line):
+            if w in black:  # движок-чёрный занял клетку линии → перехватил
+                break
+            white.add(w)
+            moves.append(w)
+            if _made_five(white, w, exactly=False):  # белые собрали 5 → движок СЛИЛ
+                conceded = True
+                break
+            if i < len(line) - 1:
+                e = await reg.compute_move("g", moves, params)
+                black.add(e)
+                moves.append(e)
+                if _made_five(black, e, exactly=True):  # чёрные сами собрали 5 → перехват
+                    break
+        assert not conceded, (
+            f"движок-чёрный слил тривиальную белую линию (поломка вождения?): {moves}"
+        )
+        assert reg._slots["g"].synced == moves
     finally:
         await reg.close()
 
@@ -201,7 +245,14 @@ async def test_compute_move_replies_to_human_move(rapfi_paths):
 async def test_forbidden_points_cold_on_fresh_process(rapfi_paths):
     """Cold-форбид на СВЕЖЕМ процессе (synced=None, без предшествующего compute_move):
     _attempt_forbid сам шлёт START+правило (создают доску под YXBOARD), затем
-    YXBOARD+YXSHOWFORBID. Движок распознаёт запрещённую точку — двойную тройку на (7,7)."""
+    YXBOARD+YXSHOWFORBID. Движок распознаёт запрещённую точку — двойную тройку на (7,7).
+
+    NB (rj-xv1): детект фола на ЖИВОМ движке проверяем ТОЛЬКО cold (все камни ставит тест,
+    хода движка нет → позиция гарантирована). Warm-форбид (запрос на уже синхронизированной
+    позиции) на живом движке отдельно НЕ тестируем: гарантировать фол там нельзя без
+    гарантированного хода движка (движок сам может занять точку фола), а это недетерминизм =
+    флак. Команды warm-форбида (только YXSHOWFORBID, без сброса synced) покрыты юнитом
+    tests/unit/test_registry.py."""
     # позиция проверена живым прогоном: двойная тройка чёрных в (7,7)
     moves = [(8, 7), (0, 0), (9, 7), (0, 2), (7, 8), (0, 4), (7, 9), (0, 6)]
     reg = _reg(rapfi_paths)
