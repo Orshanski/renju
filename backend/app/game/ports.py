@@ -20,10 +20,16 @@ class EngineAdapter(Protocol):
         allowed_zone: frozenset[Point] | None = None,
         *,
         level_tag: str = "-",
+        nnue: bool | None = None,
     ) -> Point: ...
 
     async def forbidden_points(
-        self, game_id: str, moves: Sequence[Point], *, level_tag: str = "-"
+        self,
+        game_id: str,
+        moves: Sequence[Point],
+        *,
+        level_tag: str = "-",
+        nnue: bool | None = None,
     ) -> list[Point]: ...
 
     async def sync_after_undo(

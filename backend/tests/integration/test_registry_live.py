@@ -12,9 +12,14 @@ from app.rapfi.registry import EngineRegistry
 P = EngineParams(strength=5, timeout_turn_ms=1000)
 
 
-def _reg(rapfi_paths):
+def _reg(rapfi_paths, tmp_path=None):
+    import tempfile
+
     b, c, cwd = rapfi_paths
-    return EngineRegistry(bin_path=b, config_path=c, cwd=cwd, idle_timeout_s=100.0)
+    data_dir = tmp_path if tmp_path is not None else Path(tempfile.mkdtemp())
+    return EngineRegistry(
+        bin_path=b, config_path=c, cwd=cwd, idle_timeout_s=100.0, data_dir=data_dir
+    )
 
 
 _DIRS = [(1, 0), (0, 1), (1, 1), (1, -1)]
@@ -297,7 +302,7 @@ async def test_recovers_after_engine_crash(rapfi_paths):
         await reg.close()
 
 
-async def test_hanging_engine_killed_by_wall_clock(rapfi_paths):
+async def test_hanging_engine_killed_by_wall_clock(rapfi_paths, tmp_path):
     """Зависший движок убивается по wall-clock и поднимает EngineError."""
     _, config_path, cwd = rapfi_paths
     hang = Path(__file__).parent / "fixtures" / "hang_engine.sh"
@@ -307,6 +312,7 @@ async def test_hanging_engine_killed_by_wall_clock(rapfi_paths):
         cwd=cwd,
         idle_timeout_s=100,
         wall_clock_slack_s=0.2,
+        data_dir=tmp_path,
     )
     try:
         params = EngineParams(strength=100, timeout_turn_ms=200)
@@ -381,5 +387,127 @@ async def test_block_does_not_leak_to_next_request(rapfi_paths):
         target = [(7, 7), (8, 8), first, (0, 2)]  # следующий ход человека, уже вне дебюта
         move = await reg.compute_move("g", target, FAST)  # без зоны, через TURN 0,2
         assert move not in set(target)
+    finally:
+        await reg.close()
+
+
+# ---------------------------------------------------------------------------
+# B3c: тесты per-game конфига (assembled config)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("nnue", [True, False])
+async def test_engine_holds_line_under_assembled_config(rapfi_paths, tmp_path, nnue):
+    """Движок держит линию под СГЕНЕРИРОВАННЫМ per-game конфигом (nnue=True и nnue=False).
+
+    Проверяем свойство: движок-чёрный перехватывает простую белую линию при работе
+    под per-game TOML (nnue=on — с нейросетью, nnue=off — только классика).
+    Смысл: и в том и в другом режиме реестр собирает рабочий конфиг, процесс
+    реально поднимается, и наше вождение (откат + повтор) его не ломает.
+
+    Строим по образцу test_engine_black_holds_line_through_undo:
+    движок-чёрный, человек-белый тянет линию [(8,7)…(12,7)].
+    cwd=engine_dir, data_dir=tmp_path — чтобы относительные пути весов резолвились.
+    """
+    bin_path, base_config, _ = rapfi_paths
+    engine_dir = base_config.parent
+    reg = EngineRegistry(
+        bin_path=bin_path,
+        config_path=base_config,
+        cwd=engine_dir,
+        idle_timeout_s=100.0,
+        data_dir=tmp_path,
+    )
+    line = [(8, 7), (9, 7), (10, 7), (11, 7), (12, 7)]  # человек БЕЛЫМИ тянет прямую
+    params = EngineParams(strength=15, timeout_turn_ms=1000)
+    try:
+        # движок-чёрный ставит первый ход сам (свободно, как BEGIN в пробе)
+        e1 = await reg.compute_move("g", [], params, nnue=nnue)
+        moves: list[tuple[int, int]] = [e1]
+        black: set[tuple[int, int]] = {e1}
+
+        # Фаза 1: построить до тройки белых; движок-чёрный отвечает
+        for w in line[:3]:
+            if w in black:  # движок занял клетку линии — не ломаемся
+                break
+            moves.append(w)
+            e = await reg.compute_move("g", moves, params, nnue=nnue)
+            black.add(e)
+            moves.append(e)
+
+        # Фаза 2+3: откат до первого хода + YXHASHCLEAR (sync_after_undo)
+        await reg.sync_after_undo("g", [e1])
+        assert reg._slots["g"].synced == [e1]
+
+        # Фаза 4: заново вся белая линия; перехват движка-чёрного — по геометрии
+        moves = [e1]
+        black = {e1}
+        white: set[tuple[int, int]] = set()
+        conceded = False
+        for i, w in enumerate(line):
+            if w in black:  # движок-чёрный занял клетку линии → перехватил
+                break
+            white.add(w)
+            moves.append(w)
+            if _made_five(white, w, exactly=False):  # белые собрали 5 → движок слил
+                conceded = True
+                break
+            if i < len(line) - 1:
+                e = await reg.compute_move("g", moves, params, nnue=nnue)
+                black.add(e)
+                moves.append(e)
+                if _made_five(black, e, exactly=True):  # чёрные сами собрали 5 → перехват
+                    break
+        assert not conceded, (
+            f"движок-чёрный слил тривиальную белую линию под assembled config "
+            f"(nnue={nnue}, поломка вождения?): {moves}"
+        )
+    finally:
+        await reg.close()
+
+
+async def test_config_lifecycle_assemble_delete_regenerate(rapfi_paths, tmp_path):
+    """Капстоун: полный жизненный цикл per-game конфига.
+
+    Проверяем: файл собирается при входе (mark_present), удаляется при уходе
+    последнего устройства (mark_absent), и пересобирается при возобновлении.
+    mark_present спавнит синхронно: после await reg.mark_present(…) cfg_file уже
+    существует (присутствие=1, слот поднят).
+    """
+    bin_path, base_config, _ = rapfi_paths
+    engine_dir = base_config.parent
+    game_id = "g"
+    reg = EngineRegistry(
+        bin_path=bin_path,
+        config_path=base_config,
+        cwd=engine_dir,
+        idle_timeout_s=100.0,
+        data_dir=tmp_path,
+    )
+    cfg_file = tmp_path / "engine_configs" / f"{game_id}.toml"
+    try:
+        # Шаг 2: ВХОД — поднять процесс с nnue=False; mark_present спавнит синхронно
+        await reg.mark_present(game_id, nnue=False)
+        assert cfg_file.exists(), "per-game TOML должен быть создан сразу после mark_present"
+
+        # один ход — убедиться, что движок реально функционален под этим конфигом
+        mv = await reg.compute_move(game_id, [(7, 7)], P, nnue=False)
+        assert _on_board(mv) and mv != (7, 7), f"движок вернул нелегальный ход: {mv}"
+
+        # Шаг 3: ОСТАНОВКА — mark_absent гасит процесс (presence: 1→0, inflight=0 → _terminate)
+        await reg.mark_absent(game_id, reason="leave")
+        assert not cfg_file.exists(), (
+            "per-game TOML должен быть удалён при уходе последнего устройства"
+        )
+        assert game_id not in reg._slots, "слот должен быть изъят из реестра"
+
+        # Шаг 4: ВОЗОБНОВЛЕНИЕ — новый вход; cfg_file должен быть пересобран
+        await reg.mark_present(game_id, nnue=False)
+        assert cfg_file.exists(), "per-game TOML должен быть пересобран при возобновлении"
+
+        mv2 = await reg.compute_move(game_id, [(7, 7)], P, nnue=False)
+        assert _on_board(mv2) and mv2 != (7, 7), (
+            f"движок вернул нелегальный ход после возобновления: {mv2}"
+        )
     finally:
         await reg.close()

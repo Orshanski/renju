@@ -79,7 +79,7 @@ async def test_enter_leave_call_registry(app, client, games_api):
     calls = []
 
     class PresenceAdapter(games_api.FakeAdapter):
-        async def mark_present(self, game_id, level_tag="-"):
+        async def mark_present(self, game_id, level_tag="-", *, nnue=None):
             calls.append(("enter", game_id))
 
         async def mark_absent(self, game_id, *, reason="leave"):

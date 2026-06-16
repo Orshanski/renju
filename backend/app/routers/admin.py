@@ -5,8 +5,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..auth import CurrentUser, require_admin
+from ..config_repository import ConfigRepository
 from ..db.deps import get_session
 from ..dtos.auth import UserDTO
+from ..dtos.engine_config import EngineConfigBody, EngineConfigDTO, LevelConfigDTO
 from ..services import admin_service
 from .auth import current_user
 
@@ -64,3 +66,37 @@ async def reset_password(
 ):
     await admin_service.reset_password(session, user_id, body.password)
     return {"ok": True}
+
+
+def _build_engine_config_dto(levels: list, nnue: bool) -> EngineConfigDTO:
+    return EngineConfigDTO(
+        levels=[
+            LevelConfigDTO(id=lv.id, name=lv.name, strength=lv.strength, timeout_ms=lv.timeout_ms)
+            for lv in levels
+        ],
+        nnue=nnue,
+    )
+
+
+@router.get("/engine-config", response_model=EngineConfigDTO)
+async def get_engine_config(
+    _: Annotated[CurrentUser, Depends(admin_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> EngineConfigDTO:
+    repo = ConfigRepository(session)
+    levels = await repo.levels()
+    return _build_engine_config_dto(levels, await repo.nnue())
+
+
+@router.put("/engine-config", response_model=EngineConfigDTO)
+async def put_engine_config(
+    body: EngineConfigBody,
+    _: Annotated[CurrentUser, Depends(admin_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> EngineConfigDTO:
+    repo = ConfigRepository(session)
+    # неизвестный level_id → UnknownLevelError → 422 (см. error_handlers._MAP)
+    await repo.update(body.levels, body.nnue)
+    await session.commit()
+    levels = await repo.levels()
+    return _build_engine_config_dto(levels, await repo.nnue())

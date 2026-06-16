@@ -1,4 +1,7 @@
 from app.game.controllers import (
+    Engine,
+    controller_from_json,
+    controller_to_json,
     engine_level_id,
     engine_level_tag,
     public_view,
@@ -8,7 +11,13 @@ from app.game.controllers import (
 # Реальная форма: ключ стороны = Color.value ("black"/"white"), см. service.py:141-143.
 BLACK_HUMAN = {
     "black": {"kind": "user", "user_id": 7},
-    "white": {"kind": "engine", "level_id": "master"},
+    "white": {
+        "kind": "engine",
+        "level_id": "master",
+        "strength": 90,
+        "timeout_ms": 6000,
+        "nnue": True,
+    },
 }
 BOTH_HUMAN = {
     "black": {"kind": "user", "user_id": 7},
@@ -39,3 +48,16 @@ def test_public_view_hides_other_user_id_keeps_engine_level():
         "black": {"kind": "user"},
         "white": {"kind": "engine", "levelId": "master"},
     }
+
+
+def test_engine_carries_frozen_config():
+    e = Engine(level_id="master", strength=90, timeout_ms=6000, nnue=True)
+    j = controller_to_json(e)
+    assert j == {
+        "kind": "engine",
+        "level_id": "master",
+        "strength": 90,
+        "timeout_ms": 6000,
+        "nnue": True,
+    }
+    assert controller_from_json(j) == e

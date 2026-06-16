@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-route
 import { lazy, Suspense, useEffect } from "react";
 import { AuthProvider } from "./auth/AuthContext";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
+import { AdminRoute } from "./admin/AdminRoute";
 import { setUnauthorizedHandler } from "./api/client";
 import { Shell } from "./components/Shell";
 
@@ -10,6 +11,8 @@ const LoginPage = lazy(() => import("./pages/LoginPage"));
 const HomePage = lazy(() => import("./pages/HomePage"));
 const GamePage = lazy(() => import("./pages/GamePage"));
 const NewGamePage = lazy(() => import("./pages/NewGamePage"));
+const AdminPage = lazy(() => import("./admin/AdminPage"));
+const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 
 function UnauthorizedBridge() {
   const navigate = useNavigate();
@@ -35,6 +38,10 @@ export default function App() {
                 <Route path="/" element={<HomePage />} />
                 <Route path="/new" element={<NewGamePage />} />
                 <Route path="/game/:gameId" element={<GamePage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+                <Route element={<AdminRoute />}>
+                  <Route path="/admin" element={<AdminPage />} />
+                </Route>
               </Route>
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />

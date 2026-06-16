@@ -22,6 +22,7 @@ from .adapter import (
     _move_commands,
     incremental_move_commands,
 )
+from .engine_config_file import build_engine_config, remove_engine_config
 from .process import EngineProcessDied, RapfiProcess
 from .protocol import (
     LineKind,
@@ -64,6 +65,7 @@ class EngineSlot:
     last_activity: float = 0.0
     level_tag: str = "-"
     synced: list[Point] | None = None  # позиция движка вкл. его ход; None = не инициализирован
+    config_path: Path | None = None  # per-game TOML; None = использовать глобальный шаблон
 
 
 class EngineRegistry:
@@ -76,12 +78,14 @@ class EngineRegistry:
         config_path: Path,
         cwd: Path,
         idle_timeout_s: float,
+        data_dir: Path,
         kill_grace_s: float = 2.0,
         wall_clock_slack_s: float = _WALL_CLOCK_SLACK_S,
         spawn: SpawnFn = RapfiProcess.spawn,
         now: Callable[[], float] = time.monotonic,
     ):
         self._bin, self._config, self._cwd = bin_path, config_path, cwd
+        self._data_dir = data_dir
         self._idle, self._grace, self._slack = idle_timeout_s, kill_grace_s, wall_clock_slack_s
         self._spawn, self._now = spawn, now
         self._slots: dict[str, EngineSlot] = {}
@@ -96,10 +100,11 @@ class EngineRegistry:
         allowed_zone: frozenset[Point] | None = None,
         *,
         level_tag: str = "-",
+        nnue: bool | None = None,
     ) -> Point:
         target: list[Point] = [(m[0], m[1]) for m in moves]  # нормализованный список Point
         timeout = params.timeout_turn_ms / 1000 + self._slack
-        slot = await self._claim(game_id, level_tag, "inflight")
+        slot = await self._claim(game_id, level_tag, "inflight", nnue=nnue)
         t0 = self._now()  # после claim: ms = время расчёта, не spawn (spawn — своя лог-строка)
         try:
             parsed = await self._run_move(slot, game_id, target, params, allowed_zone, timeout)
@@ -130,12 +135,17 @@ class EngineRegistry:
         return parsed.move
 
     async def forbidden_points(
-        self, game_id: str, moves: Sequence[Point], *, level_tag: str = "-"
+        self,
+        game_id: str,
+        moves: Sequence[Point],
+        *,
+        level_tag: str = "-",
+        nnue: bool | None = None,
     ) -> list[Point]:
         if len(moves) % 2 != 0:
             return []
         target: list[Point] = [(m[0], m[1]) for m in moves]
-        slot = await self._claim(game_id, level_tag, "inflight")
+        slot = await self._claim(game_id, level_tag, "inflight", nnue=nnue)
         try:
             parsed = await self._run_forbid(slot, game_id, target, _FORBID_TIMEOUT_S)
         finally:
@@ -237,9 +247,11 @@ class EngineRegistry:
         finally:
             await self._unclaim(slot, "inflight")
 
-    async def mark_present(self, game_id: str, level_tag: str = "-") -> None:
+    async def mark_present(
+        self, game_id: str, level_tag: str = "-", *, nnue: bool | None = None
+    ) -> None:
         """enter: presence++ (spawn если первый)."""
-        await self._claim(game_id, level_tag, "presence")
+        await self._claim(game_id, level_tag, "presence", nnue=nnue)
 
     async def mark_absent(self, game_id: str, *, reason: str = "leave") -> None:
         """leave: presence-- (release если ушло последнее устройство и нет расчёта)."""
@@ -300,7 +312,9 @@ class EngineRegistry:
 
     # --- claim/unclaim: get-or-create + counter под одним локом, затем spawn вне лока ---
 
-    async def _claim(self, game_id: str, level_tag: str, counter: str) -> EngineSlot:
+    async def _claim(
+        self, game_id: str, level_tag: str, counter: str, *, nnue: bool | None = None
+    ) -> EngineSlot:
         while True:  # петля, не рекурсия: при провале создателя waiter пересоздаёт без роста стека
             async with self._cond:
                 if self._closing:
@@ -316,22 +330,40 @@ class EngineRegistry:
                 setattr(slot, counter, getattr(slot, counter) + 1)
                 slot.last_activity = self._now()
             if creator:
-                await self._spawn_into(game_id, slot, counter)
+                await self._spawn_into(game_id, slot, counter, nnue=nnue)
                 return slot
             await slot.ready.wait()
             if slot.proc is not None:
                 return slot
             await self._unclaim(slot, counter)  # создатель упал → снять заявку и ретрай (loop)
 
-    async def _spawn_into(self, game_id: str, slot: EngineSlot, counter: str) -> None:
+    async def _spawn_into(
+        self, game_id: str, slot: EngineSlot, counter: str, *, nnue: bool | None = None
+    ) -> None:
+        # Собираем per-game конфиг при первом спавне (immutable на сессию)
+        if nnue is not None and slot.config_path is None:
+            slot.config_path = build_engine_config(
+                nnue=nnue,
+                game_id=game_id,
+                data_dir=self._data_dir,
+                base=self._config.read_text(),
+            )
+        effective_config = slot.config_path if slot.config_path is not None else self._config
         try:
-            proc = await self._spawn(bin_path=self._bin, config_path=self._config, cwd=self._cwd)
+            proc = await self._spawn(
+                bin_path=self._bin, config_path=effective_config, cwd=self._cwd
+            )
         except BaseException:
             async with self._cond:
                 setattr(slot, counter, getattr(slot, counter) - 1)
                 self._slots.pop(game_id, None)
                 slot.ready.set()
                 self._cond.notify_all()
+                # Спавн упал: слот изъят и до _terminate не дойдёт. Если МЫ собрали файл
+                # в этот заход — убрать ПОД ЛОКОМ (атомарно с pop, без окна гонки), иначе он
+                # осиротеет (на устойчивом сбое — вечная утечка).
+                if slot.config_path is not None:
+                    remove_engine_config(game_id, self._data_dir)
             raise
         orphan = None
         async with self._cond:
@@ -340,6 +372,15 @@ class EngineRegistry:
                 setattr(slot, counter, getattr(slot, counter) - 1)
                 slot.ready.set()
                 self._cond.notify_all()
+                # Слот не получит proc → close() его пропустит (гейт `if s.proc`), а _terminate
+                # не вызовется. Убираем собранный файл ПОД ЛОКОМ (снимок _slots атомарен с unlink),
+                # но только если его не перехватил НОВЫЙ слот того же game_id (recreate владеет тем
+                # же именем и уберёт сам). КРИТИЧНО под локом, а НЕ после `await terminate` ниже:
+                # иначе recreate в окне await успел бы записать файл, и мы снесли бы ЖИВОЙ конфиг.
+                if slot.config_path is not None and (
+                    self._closing or self._slots.get(game_id) is None
+                ):
+                    remove_engine_config(game_id, self._data_dir)
             else:
                 slot.proc, slot.pid = proc, proc.pid
                 slot.synced = None  # свежий процесс — состояние движка неизвестно
@@ -486,7 +527,10 @@ class EngineRegistry:
         if slot.proc is not None:  # лог смены pid (наблюдаемость respawn, §3.1/§7)
             _log.warning("kill game=%s pid=%s reason=%s", game_id, slot.pid, reason)
             await slot.proc.terminate(grace_s=self._grace)
-        slot.proc = await self._spawn(bin_path=self._bin, config_path=self._config, cwd=self._cwd)
+        effective_config = slot.config_path if slot.config_path is not None else self._config
+        slot.proc = await self._spawn(
+            bin_path=self._bin, config_path=effective_config, cwd=self._cwd
+        )
         slot.pid = slot.proc.pid
         slot.synced = None  # новый процесс — состояние движка неизвестно
         _log.info(
@@ -499,6 +543,7 @@ class EngineRegistry:
             await slot.proc.terminate(grace_s=self._grace)
             slot.proc = None
             _log.info("kill game=%s pid=%s reason=%s", game_id, pid, reason)
+        remove_engine_config(game_id, self._data_dir)  # best-effort; silent if missing
 
     async def _discard_slot(self, game_id: str, slot: EngineSlot, reason: str) -> None:
         """Убрать испорченный slot из реестра и завершить его процесс."""

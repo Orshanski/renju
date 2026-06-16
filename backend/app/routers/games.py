@@ -6,18 +6,20 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..auth import CurrentUser, decode_token, fetch_token_epoch, get_current_user
+from ..config_repository import ConfigRepository
+from ..db.deps import get_session
 from ..domain.errors import MoveRejected, UndoRejected
 from ..domain.retention import Section, game_section
 from ..domain.values import GameStatus
 from ..exceptions import BadInputError
-from ..game.controllers import engine_level_tag
+from ..game.controllers import Engine, engine_level_tag, engine_nnue
 from ..game.deps import build_game_service, make_game_service
 from ..game.dtos import CreateGameBody, GameSummaryDTO, LevelDTO
 from ..game.mappers import state_payload, summary_dto
 from ..game.service import GameService
-from ..levels_config import resolve_level
 from ..logging_utils import safe
 from .auth import current_user
 
@@ -26,8 +28,12 @@ router = APIRouter(prefix="/api", tags=["games"])
 
 
 @router.get("/levels", response_model=list[LevelDTO])
-async def levels(request: Request, _: Annotated[CurrentUser, Depends(current_user)]):
-    return [LevelDTO(id=lv.id, name=lv.name) for lv in request.app.state.levels.values()]
+async def levels(
+    _: Annotated[CurrentUser, Depends(current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+):
+    cfg = ConfigRepository(session)
+    return [LevelDTO(id=lv.id, name=lv.name) for lv in await cfg.levels()]
 
 
 @router.post("/games")
@@ -36,14 +42,24 @@ async def create_game(
     request: Request,
     user: Annotated[CurrentUser, Depends(current_user)],
     service: Annotated[GameService, Depends(build_game_service)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ):
     if body.opponent.kind != "engine":
         raise BadInputError("only engine opponent supported")
-    if resolve_level(list(request.app.state.levels.values()), body.opponent.levelId) is None:
+    cfg = ConfigRepository(session)
+    level = await cfg.get_level(body.opponent.levelId)
+    if level is None:
         raise BadInputError("unknown levelId")
+    nnue = await cfg.nnue()
+    engine_ctl = Engine(
+        level_id=level.id,
+        strength=level.strength,
+        timeout_ms=level.timeout_ms,
+        nnue=nnue,
+    )
     human = random.choice(["black", "white"])
     game = await service.create_game(
-        owner_id=user.user_id, opponent_level=body.opponent.levelId, human_color=human
+        owner_id=user.user_id, engine_ctl=engine_ctl, human_color=human
     )
     if game.status == GameStatus.OPPONENT_THINKING.value:  # человек-чёрный → движок в фоне
         request.app.state.advance.schedule(game.id)
@@ -174,7 +190,9 @@ async def enter(
     game = await service.get_game(game_id, user.user_id)  # 404 если нет доступа
     adapter = request.app.state.adapter
     if adapter is not None:
-        await adapter.mark_present(game_id, engine_level_tag(game.controllers))
+        await adapter.mark_present(
+            game_id, engine_level_tag(game.controllers), nnue=engine_nnue(game.controllers)
+        )
     return {"ok": True}
 
 

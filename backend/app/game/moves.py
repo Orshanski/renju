@@ -28,7 +28,13 @@ def apply_move(moves: Sequence[Point], point: Point) -> list[Point]:
 
 
 async def engine_move(
-    adapter, moves: Sequence[Point], params: EngineParams, game_id: str, level_tag: str = "-"
+    adapter,
+    moves: Sequence[Point],
+    params: EngineParams,
+    game_id: str,
+    level_tag: str = "-",
+    *,
+    nnue: bool | None = None,
 ) -> Point:
     """Ход движка для позиции; дебютное обуздание спрятано. Инвариант: moves
     непуст (центр предзаполнен new_game), поэтому allowed_zone не бывает синглтоном.
@@ -42,5 +48,5 @@ async def engine_move(
     кладёт ~99%, поэтому зону НЕ накладываем (на редкий выход не рубим — допускаем ~1/100)."""
     zone = opening_zone(len(moves)) if len(moves) == 1 else None
     return await adapter.compute_move(
-        game_id, moves, params, allowed_zone=zone, level_tag=level_tag
+        game_id, moves, params, allowed_zone=zone, level_tag=level_tag, nnue=nnue
     )

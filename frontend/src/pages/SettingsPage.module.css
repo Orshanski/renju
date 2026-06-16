@@ -1,0 +1,31 @@
+/* Стаб страницы Настроек — по образцу AdminPage.module.css */
+@value sumi, sumiSoft, sumiFaint, fontSerif, fontSans from "../styles/tokens.module.css";
+
+.wrap {
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.eyebrow {
+  font-family: fontSans;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: sumiFaint;
+  margin-bottom: 6px;
+}
+
+.title {
+  font-family: fontSerif;
+  font-size: 28px;
+  font-weight: 700;
+  color: sumi;
+  margin: 0 0 28px;
+}
+
+.stub {
+  color: sumiFaint;
+  font-family: fontSans;
+  font-size: 15px;
+  padding: 32px 0;
+}

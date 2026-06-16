@@ -1,7 +1,19 @@
+from app.game.controllers import Engine
 from app.game.event_hub import InMemoryEventHub
 from app.game.repository import InMemoryGameRepository
 from app.game.service import GameService
 from app.game.settings_repository import InMemorySettingsRepository
+
+# Замороженный снимок «мастер»-уровня для тестов
+_MASTER = Engine(level_id="master", strength=90, timeout_ms=6000, nnue=True)
+# Сериализованный JSON (для использования в controllers dict напрямую)
+_MASTER_JSON = {
+    "kind": "engine",
+    "level_id": "master",
+    "strength": 90,
+    "timeout_ms": 6000,
+    "nnue": True,
+}
 
 
 class FakeAdapter:
@@ -10,10 +22,12 @@ class FakeAdapter:
         self.move = (8, 8)
         self.undo_syncs = []
 
-    async def forbidden_points(self, game_id, moves, *, level_tag="-"):
+    async def forbidden_points(self, game_id, moves, *, level_tag="-", nnue=None):
         return list(self.forbid)
 
-    async def compute_move(self, game_id, moves, params, allowed_zone=None, *, level_tag="-"):
+    async def compute_move(
+        self, game_id, moves, params, allowed_zone=None, *, level_tag="-", nnue=None
+    ):
         return self.move
 
     async def sync_after_undo(self, game_id, moves, *, level_tag="-"):
@@ -25,9 +39,13 @@ def _svc(adapter=None, settings_repo=None):
         repo=InMemoryGameRepository(),
         hub=InMemoryEventHub(),
         adapter=adapter or FakeAdapter(),
-        levels={"master": object()},
         settings_repo=settings_repo or InMemorySettingsRepository(),
     )
+
+
+async def _create_game(svc, owner_id=1, human_color="black"):
+    """Хелпер: create_game с замороженным _MASTER-снимком."""
+    return await svc.create_game(owner_id=owner_id, engine_ctl=_MASTER, human_color=human_color)
 
 
 async def test_fouls_memoized_one_engine_call():
@@ -35,7 +53,7 @@ async def test_fouls_memoized_one_engine_call():
     svc._adapter.calls = 0
     orig = svc._adapter.forbidden_points
 
-    async def counting(game_id, moves, *, level_tag="-"):
+    async def counting(game_id, moves, *, level_tag="-", nnue=None):
         svc._adapter.calls += 1
         return await orig(game_id, moves, level_tag=level_tag)
 
@@ -76,21 +94,21 @@ async def test_fouls_white_to_move_empty_no_engine():
 
 async def test_create_hve_human_black_pending_engine():
     svc = _svc()
-    g = await svc.create_game(owner_id=1, opponent_level="master", human_color="black")
+    g = await _create_game(svc, owner_id=1, human_color="black")
     # центр (ход 1 = чёрные) предзаполнен = ход человека; ход 2 за движком-белым → ждём фон
     assert g.moves == [[7, 7]] and g.status == "opponent_thinking"
 
 
 async def test_create_hve_human_white_awaits_human():
     svc = _svc()
-    g = await svc.create_game(owner_id=1, opponent_level="master", human_color="white")
+    g = await _create_game(svc, owner_id=1, human_color="white")
     # центр = ход 1 = чёрные = движок (предзаполнен); ход 2 за человеком-белым
     assert g.moves == [[7, 7]] and g.status == "awaiting_move"
 
 
 async def test_advance_drives_engine_move():
     svc = _svc()
-    g = await svc.create_game(owner_id=1, opponent_level="master", human_color="black")
+    g = await _create_game(svc, owner_id=1, human_color="black")
     await svc.advance(g)  # «фон»: движок-белый ходит 2-м
     assert g.moves == [[7, 7], [8, 8]] and g.status == "awaiting_move"
 
@@ -121,11 +139,11 @@ async def test_advance_engine_error_publishes_error_event():
 
     svc = _svc()
 
-    async def boom(game_id, moves, params, allowed_zone=None, *, level_tag="-"):
+    async def boom(game_id, moves, params, allowed_zone=None, *, level_tag="-", nnue=None):
         raise EngineError("twice")
 
     svc._adapter.compute_move = boom
-    g = await svc.create_game(owner_id=1, opponent_level="master", human_color="black")
+    g = await _create_game(svc, owner_id=1, human_color="black")
     assert g.status == "opponent_thinking"
     await svc.advance(g)  # движок падает → error-событие, статус НЕ меняется (§4.8 доиграет позже)
     assert g.status == "opponent_thinking"
@@ -134,7 +152,7 @@ async def test_advance_engine_error_publishes_error_event():
 
 async def test_submit_move_then_engine_replies_via_advance():
     svc = _svc()
-    g = await svc.create_game(owner_id=1, opponent_level="master", human_color="white")
+    g = await _create_game(svc, owner_id=1, human_color="white")
     svc._adapter.move = (5, 5)
     g = await svc.submit_move(g.id, user_id=1, point=(6, 6))  # ход 2 белые (человек)
     assert g.moves == [[7, 7], [6, 6]] and g.status == "opponent_thinking"  # ждём движок
@@ -174,14 +192,14 @@ async def test_submit_foreign_user_not_found():
     from app.exceptions import NotFoundError
 
     svc = _svc()
-    g = await svc.create_game(owner_id=1, opponent_level="master", human_color="black")
+    g = await _create_game(svc, owner_id=1, human_color="black")
     with pytest.raises(NotFoundError):  # user 2 не участник одиночной HvE-партии
         await svc.submit_move(g.id, user_id=2, point=(6, 6))
 
 
 async def test_undo_pure_replay_no_engine():
     svc = _svc()
-    g = await svc.create_game(owner_id=1, opponent_level="master", human_color="white")
+    g = await _create_game(svc, owner_id=1, human_color="white")
     svc._adapter.move = (6, 6)
     g = await svc.submit_move(g.id, user_id=1, point=(8, 8))  # ход 2 белые (реальный ход человека)
     await svc.advance(g)  # «фон»: движок-чёрный ходит 3-м → [[7,7],[8,8],[6,6]]
@@ -190,7 +208,7 @@ async def test_undo_pure_replay_no_engine():
     svc._adapter.calls = 0
     orig = svc._adapter.forbidden_points
 
-    async def counting(game_id, m):
+    async def counting(game_id, m, **kw):
         svc._adapter.calls += 1
         return await orig(game_id, m)
 
@@ -204,7 +222,7 @@ async def test_undo_pure_replay_no_engine():
 
 async def test_advance_recovers_and_is_idempotent():
     svc = _svc()
-    g = await svc.create_game(owner_id=1, opponent_level="master", human_color="black")
+    g = await _create_game(svc, owner_id=1, human_color="black")
     # create оставил opponent_thinking (ход 2 за движком); фоновой задачи в юните нет
     assert g.status == "opponent_thinking" and g.moves == [[7, 7]]
     await svc.advance(g)  # «восстановление»: движок-белый ходит 2-м
@@ -218,7 +236,7 @@ async def test_advance_recovery_when_engine_move_already_applied():
     # реальный краш: ход движка УЖЕ закоммичен, но статус застрял opponent_thinking
     # (упали между repo.update(move) и переходом в awaiting_move) → recovery НЕ двигает повторно
     svc = _svc()
-    g = await svc.create_game(owner_id=1, opponent_level="master", human_color="black")
+    g = await _create_game(svc, owner_id=1, human_color="black")
     await svc.advance(g)  # движок сходил → [[7,7],[8,8]], awaiting_move (ход человека-чёрного)
     g.status = "opponent_thinking"
     await svc._repo.update(g)  # симулируем застрявший статус
@@ -241,7 +259,7 @@ async def test_get_game_pure_access_check():
     from app.exceptions import NotFoundError
 
     svc = _svc()
-    g = await svc.create_game(owner_id=1, opponent_level="master", human_color="black")
+    g = await _create_game(svc, owner_id=1, human_color="black")
     assert (await svc.get_game(g.id, user_id=1)).id == g.id  # участник — ок
     with pytest.raises(NotFoundError):
         await svc.get_game(g.id, user_id=2)  # чужой → 404
@@ -260,7 +278,7 @@ async def test_undo_no_engine_even_with_sparse_log():
     svc._adapter.calls = 0
     orig = svc._adapter.forbidden_points
 
-    async def counting(game_id, m):
+    async def counting(game_id, m, **kw):
         svc._adapter.calls += 1
         return await orig(game_id, m)
 
@@ -273,7 +291,7 @@ async def test_undo_no_engine_even_with_sparse_log():
         forbidden_log={},  # НАМЕРЕННО пусто — провоцируем движок у старого кода
         controllers={
             "black": {"kind": "user", "user_id": 1},
-            "white": {"kind": "engine", "level_id": "master"},
+            "white": _MASTER_JSON,
         },
         status="awaiting_move",
     )
@@ -289,7 +307,7 @@ async def test_advance_engine_black_does_not_query_fouls():
     svc._adapter.calls = 0
     orig = svc._adapter.forbidden_points
 
-    async def counting(game_id, moves, *, level_tag="-"):
+    async def counting(game_id, moves, *, level_tag="-", nnue=None):
         svc._adapter.calls += 1
         return await orig(game_id, moves, level_tag=level_tag)
 
@@ -301,7 +319,7 @@ async def test_advance_engine_black_does_not_query_fouls():
         undo_count=0,
         forbidden_log={},
         controllers={
-            "black": {"kind": "engine", "level_id": "master"},
+            "black": _MASTER_JSON,
             "white": {"kind": "user", "user_id": 1},
         },
         status="opponent_thinking",
@@ -321,10 +339,12 @@ async def test_eve_advance_drives_both_engine_sides():
         def __init__(self):
             self.i = 0
 
-        async def forbidden_points(self, game_id, moves, *, level_tag="-"):
+        async def forbidden_points(self, game_id, moves, *, level_tag="-", nnue=None):
             return []
 
-        async def compute_move(self, game_id, moves, params, allowed_zone=None, *, level_tag="-"):
+        async def compute_move(
+            self, game_id, moves, params, allowed_zone=None, *, level_tag="-", nnue=None
+        ):
             mv = seq[self.i]
             self.i += 1
             return mv
@@ -340,8 +360,8 @@ async def test_eve_advance_drives_both_engine_sides():
         undo_count=0,
         forbidden_log={},
         controllers={
-            "black": {"kind": "engine", "level_id": "master"},
-            "white": {"kind": "engine", "level_id": "master"},
+            "black": _MASTER_JSON,
+            "white": _MASTER_JSON,
         },
         status="opponent_thinking",
     )
@@ -375,12 +395,12 @@ async def test_finish_sets_finished_at_and_evicts_over_limit():
 
     now = datetime(2026, 1, 1, 12, 0, 0)
     ctl_hve = {
-        "black": {"kind": "engine", "level_id": "master"},
+        "black": _MASTER_JSON,
         "white": {"kind": "user", "user_id": 1},
     }
     ctl_finished = {
         "black": {"kind": "user", "user_id": 1},
-        "white": {"kind": "engine", "level_id": "master"},
+        "white": _MASTER_JSON,
     }
 
     # Две старые завершённые — засеиваем с явными finished_at
@@ -469,7 +489,7 @@ async def test_create_evicts_current_over_limit():
     now = datetime(2026, 1, 1, 12, 0, 0)
     ctl = {
         "black": {"kind": "user", "user_id": 1},
-        "white": {"kind": "engine", "level_id": "master"},
+        "white": _MASTER_JSON,
     }
 
     g_stale = Game(
@@ -502,7 +522,7 @@ async def test_create_evicts_current_over_limit():
     await svc._repo.create(g_newer)
 
     # Создаём 3-ю → вытеснение
-    g_third = await svc.create_game(owner_id=1, opponent_level="master", human_color="white")
+    g_third = await _create_game(svc, owner_id=1, human_color="white")
 
     all_games = await svc._repo.list_by_owner(1)
     current = [g for g in all_games if not g.status.startswith("finished_") and g.favorite is False]
@@ -537,7 +557,7 @@ async def test_favorite_only_finished_and_exempt_from_limit():
     now = datetime(2026, 1, 1, 12, 0, 0)
     ctl = {
         "black": {"kind": "user", "user_id": 1},
-        "white": {"kind": "engine", "level_id": "master"},
+        "white": _MASTER_JSON,
     }
     moves_finished = [[7, 7], [8, 8], [9, 9], [10, 10], [11, 11]]
 
@@ -637,7 +657,7 @@ async def test_unfavorite_returns_to_finished_and_rechecks_limit():
     now = datetime(2026, 1, 1, 12, 0, 0)
     ctl = {
         "black": {"kind": "user", "user_id": 1},
-        "white": {"kind": "engine", "level_id": "master"},
+        "white": _MASTER_JSON,
     }
     moves_finished = [[7, 7], [8, 8], [9, 9], [10, 10], [11, 11]]
 
@@ -690,7 +710,7 @@ async def test_delete_game_removes():
     from app.exceptions import NotFoundError
 
     svc = _svc()
-    g = await svc.create_game(owner_id=1, opponent_level="master", human_color="white")
+    g = await _create_game(svc, owner_id=1, human_color="white")
     gid = g.id
 
     # чужой → NotFoundError
@@ -723,7 +743,7 @@ async def test_enforce_limits_trims_both_sections():
     now = datetime(2026, 1, 1, 12, 0, 0)
     ctl = {
         "black": {"kind": "user", "user_id": 1},
-        "white": {"kind": "engine", "level_id": "master"},
+        "white": _MASTER_JSON,
     }
 
     # 2 текущих
@@ -789,7 +809,7 @@ async def test_undo_resets_finished_at():
         owner_id=1,
         controllers={
             "black": {"kind": "user", "user_id": 1},
-            "white": {"kind": "engine", "level_id": "master"},
+            "white": _MASTER_JSON,
         },
         moves=[[7, 7], [8, 8], [9, 9], [10, 10], [11, 11]],
         status="finished_black",

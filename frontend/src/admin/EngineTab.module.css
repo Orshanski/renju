@@ -1,0 +1,152 @@
+/* Экран «Движок» — по prototype/index.html #atab-engine */
+@value sumi, sumiSoft, sumiFaint, vermillion, vermillionDeep, paper, okGreen, r, rInput, fontSans from "../styles/tokens.module.css";
+
+.sub {
+  color: sumiSoft;
+  font-family: fontSans;
+  font-size: 14px;
+  margin: 0 0 24px;
+  line-height: 1.55;
+}
+
+.tbl {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 28px;
+  font-family: fontSans;
+  font-size: 14px;
+}
+
+.tbl th {
+  text-align: left;
+  color: sumiFaint;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  padding: 0 12px 10px 0;
+  border-bottom: 1px solid rgba(60, 45, 25, 0.12);
+}
+
+.tbl td {
+  padding: 10px 12px 10px 0;
+  border-bottom: 1px solid rgba(60, 45, 25, 0.07);
+  color: sumi;
+  vertical-align: middle;
+}
+
+.tbl input[type="number"] {
+  width: 80px;
+  padding: 6px 10px;
+  border: 1px solid rgba(60, 45, 25, 0.25);
+  border-radius: rInput;
+  font-family: fontSans;
+  font-size: 14px;
+  color: sumi;
+  background: paper;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.tbl input[type="number"]:focus {
+  border-color: vermillion;
+}
+
+.setrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 0;
+  border-top: 1px solid rgba(60, 45, 25, 0.1);
+  margin-bottom: 28px;
+}
+
+.label {
+  font-family: fontSans;
+  font-size: 15px;
+  font-weight: 600;
+  color: sumi;
+  margin-bottom: 3px;
+}
+
+.desc {
+  font-family: fontSans;
+  font-size: 13px;
+  color: sumiFaint;
+}
+
+/* тумблер NNUE */
+.toggle {
+  width: 48px;
+  height: 26px;
+  border-radius: 13px;
+  background: rgba(60, 45, 25, 0.18);
+  border: none;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.toggle::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 4px rgba(40,28,14,0.3);
+}
+
+.on {
+  background: okGreen;
+}
+
+.on::after {
+  transform: translateX(22px);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.save {
+  padding: 10px 28px;
+  background: vermillion;
+  color: #fff;
+  border: none;
+  border-radius: r;
+  font-family: fontSans;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.3px;
+  transition: background 0.15s;
+}
+
+.save:hover:not(:disabled) {
+  background: vermillionDeep;
+}
+
+.save:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ok {
+  color: okGreen;
+  font-family: fontSans;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.errMsg {
+  color: vermillion;
+  font-family: fontSans;
+  font-size: 14px;
+}

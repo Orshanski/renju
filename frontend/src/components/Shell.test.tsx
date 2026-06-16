@@ -6,14 +6,16 @@ import { server, http, HttpResponse } from "../test/msw";
 import { AuthProvider } from "../auth/AuthContext";
 import { Shell } from "./Shell";
 
-function tree() {
+function tree(initialEntries: string[] = ["/"]) {
   return render(
     <AuthProvider>
-      <MemoryRouter initialEntries={["/"]}>
+      <MemoryRouter initialEntries={initialEntries}>
         <Routes>
           <Route path="/login" element={<div>LOGIN</div>} />
           <Route element={<Shell />}>
             <Route path="/" element={<div>HOME</div>} />
+            <Route path="/settings" element={<div>SETTINGS</div>} />
+            <Route path="/admin" element={<div>ADMIN</div>} />
           </Route>
         </Routes>
       </MemoryRouter>
@@ -57,4 +59,42 @@ it("клик «выйти» → logout → редирект на /login", async 
   await waitFor(() => expect(screen.getByText("alice")).toBeInTheDocument());
   await userEvent.click(screen.getByRole("button", { name: /выйти/i })); // текст кнопки — по прототипу
   await waitFor(() => expect(screen.getByText("LOGIN")).toBeInTheDocument());
+});
+
+it("навбар показывает вкладки «Партии» и «Настройки»", async () => {
+  server.use(http.get("/api/auth/me", () => HttpResponse.json({ id: 1, username: "alice", role: "user" })));
+  tree();
+  await waitFor(() => expect(screen.getByText("alice")).toBeInTheDocument());
+  expect(screen.getByRole("button", { name: "Партии" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Настройки" })).toBeInTheDocument();
+});
+
+it("вкладка «Админ» видна при role=admin", async () => {
+  server.use(http.get("/api/auth/me", () => HttpResponse.json({ id: 1, username: "bob", role: "admin" })));
+  tree();
+  await waitFor(() => expect(screen.getByText("bob")).toBeInTheDocument());
+  expect(screen.getByRole("button", { name: "Админ" })).toBeInTheDocument();
+});
+
+it("вкладка «Админ» НЕ видна при role=user", async () => {
+  server.use(http.get("/api/auth/me", () => HttpResponse.json({ id: 1, username: "alice", role: "user" })));
+  tree();
+  await waitFor(() => expect(screen.getByText("alice")).toBeInTheDocument());
+  expect(screen.queryByRole("button", { name: "Админ" })).not.toBeInTheDocument();
+});
+
+it("активная вкладка «Партии» при роуте /", async () => {
+  server.use(http.get("/api/auth/me", () => HttpResponse.json({ id: 1, username: "alice", role: "user" })));
+  tree(["/"]);
+  await waitFor(() => expect(screen.getByText("alice")).toBeInTheDocument());
+  expect(screen.getByRole("button", { name: "Партии" })).toHaveAttribute("aria-current", "page");
+  expect(screen.getByRole("button", { name: "Настройки" })).not.toHaveAttribute("aria-current", "page");
+});
+
+it("активная вкладка «Админ» при роуте /admin (admin-user)", async () => {
+  server.use(http.get("/api/auth/me", () => HttpResponse.json({ id: 1, username: "bob", role: "admin" })));
+  tree(["/admin"]);
+  await waitFor(() => expect(screen.getByText("bob")).toBeInTheDocument());
+  expect(screen.getByRole("button", { name: "Админ" })).toHaveAttribute("aria-current", "page");
+  expect(screen.getByRole("button", { name: "Партии" })).not.toHaveAttribute("aria-current", "page");
 });

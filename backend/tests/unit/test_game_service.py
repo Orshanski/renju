@@ -54,7 +54,9 @@ class _FakeAdapter:
         self.received_zone = "unset"
         self.received_game_id = None
 
-    async def compute_move(self, game_id, moves, params, allowed_zone=None, *, level_tag="-"):
+    async def compute_move(
+        self, game_id, moves, params, allowed_zone=None, *, level_tag="-", nnue=None
+    ):
         self.received_zone = allowed_zone
         self.received_game_id = game_id
         return (8, 8)

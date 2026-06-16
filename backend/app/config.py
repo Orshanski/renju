@@ -13,7 +13,6 @@ class Settings(BaseSettings):
 
     rapfi_bin: Path | None = None  # RENJU_RAPFI_BIN
     rapfi_config: Path = REPO_ROOT / "engine" / "config.toml"  # RENJU_RAPFI_CONFIG
-    levels_file: Path = REPO_ROOT / "backend" / "levels.toml"  # RENJU_LEVELS_FILE
     frontend_dist: Path = REPO_ROOT / "frontend" / "dist"  # RENJU_FRONTEND_DIST
     engine_kill_grace_s: float = 2.0  # сколько ждать terminate перед kill
 
