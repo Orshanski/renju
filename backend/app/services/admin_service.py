@@ -1,12 +1,15 @@
 from ..auth import bump_token_epoch, hash_password
 from ..dal import users as dal
-from ..dtos.auth import UserDTO
+from ..dtos.auth import UserAdminDTO
 from ..exceptions import ConflictError, NotFoundError
 
 
-async def list_users(session) -> list[UserDTO]:
+async def list_users(session) -> list[UserAdminDTO]:
     users = await dal.list_users(session)
-    return [UserDTO(id=u.id, username=u.username, role=u.role) for u in users]
+    return [
+        UserAdminDTO(id=u.id, username=u.username, role=u.role, created_at=u.created_at)
+        for u in users
+    ]
 
 
 async def create_user(session, username: str, password: str, role: str) -> int:
@@ -35,4 +38,23 @@ async def reset_password(session, target_id: int, new_password: str) -> None:
         raise NotFoundError("User not found")
     target.password_hash = hash_password(new_password)
     await bump_token_epoch(session, target_id)  # отзыв сессий (autoflush сбросит password_hash)
+    await session.commit()
+
+
+async def update_user(session, target_id: int, body, actor_id: int) -> None:
+    target = await dal.get_user_by_id(session, target_id)
+    if target is None:
+        raise NotFoundError("User not found")
+    if body.role is not None and body.role != target.role:
+        if actor_id == target_id:
+            raise ConflictError("Нельзя менять свою роль")
+        if body.role == "user" and await dal.is_last_admin(session, target_id):
+            raise ConflictError("Нельзя понизить последнего админа")
+        target.role = body.role
+        # autoflush сбросит role при bump; оба изменения в одной транзакции
+        await bump_token_epoch(session, target_id)
+    # body.role == target.role → no-op по роли (epoch не бампаем)
+    if body.password is not None:
+        target.password_hash = hash_password(body.password)
+        await bump_token_epoch(session, target_id)
     await session.commit()

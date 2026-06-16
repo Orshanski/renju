@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 
@@ -10,6 +12,13 @@ class UserDTO(BaseModel):
     id: int
     username: str
     role: str
+
+
+class UserAdminDTO(BaseModel):
+    id: int
+    username: str
+    role: str
+    created_at: datetime
 
 
 class LoginResponse(BaseModel):
