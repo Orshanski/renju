@@ -7,6 +7,24 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from app.config import REPO_ROOT, Settings
 
 
+async def _seed_levels(session: AsyncSession) -> None:
+    """Засев уровней сложности и глобальных настроек движка (зеркало миграции engine_config)."""
+    from app.models.level import EngineSettings, Level
+
+    levels = [
+        Level(id="novice", name="Новичок", ordering=0, strength=5, timeout_ms=1000),
+        Level(id="easy", name="Лёгкий", ordering=1, strength=15, timeout_ms=1500),
+        Level(id="low_medium", name="Ниже среднего", ordering=2, strength=35, timeout_ms=2000),
+        Level(id="high_medium", name="Выше среднего", ordering=3, strength=55, timeout_ms=2500),
+        Level(id="hard", name="Сложный", ordering=4, strength=75, timeout_ms=4000),
+        Level(id="master", name="Мастер", ordering=5, strength=90, timeout_ms=6000),
+        Level(id="god", name="Бог", ordering=6, strength=100, timeout_ms=7000),
+    ]
+    session.add_all(levels)
+    session.add(EngineSettings(id=1, nnue=True))
+    await session.commit()
+
+
 @pytest.fixture(scope="session")
 def settings() -> Settings:
     return Settings()
@@ -28,6 +46,7 @@ def rapfi_paths(settings):
 async def engine(tmp_path, monkeypatch) -> AsyncIterator[AsyncEngine]:
     monkeypatch.setenv("RENJU_DATA_DIR", str(tmp_path))
     import app.models.game  # noqa: F401
+    import app.models.level  # noqa: F401
     import app.models.user  # noqa: F401 — регистрирует таблицу в metadata
     import app.models.user_settings  # noqa: F401
     from app.config import Settings
@@ -54,6 +73,7 @@ async def session(engine) -> AsyncIterator[AsyncSession]:
 async def app(tmp_path, monkeypatch):
     monkeypatch.setenv("RENJU_DATA_DIR", str(tmp_path))
     import app.models.game  # noqa: F401
+    import app.models.level  # noqa: F401
     import app.models.user  # noqa: F401
     import app.models.user_settings  # noqa: F401
     from app.app_factory import create_app
@@ -64,6 +84,8 @@ async def app(tmp_path, monkeypatch):
     async with application.router.lifespan_context(application):  # поднимает engine/sessionmaker
         async with application.state.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+        async with application.state.sessionmaker() as s:
+            await _seed_levels(s)
         yield application
 
 
