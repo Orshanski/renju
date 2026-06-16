@@ -42,13 +42,11 @@ class GameService:
         repo: GameRepository,
         hub: EventHub,
         adapter: EngineAdapter,
-        levels: dict,
         settings_repo: SettingsRepository,
     ):
         self._repo = repo
         self._hub = hub
         self._adapter = adapter
-        self._levels = levels  # level_id → EngineParams
         self._settings_repo = settings_repo
         self._retention = RetentionService(self._repo, self._settings_repo)
 
@@ -68,7 +66,7 @@ class GameService:
 
     def _players(self, game: Game) -> dict[Color, Player]:
         return {
-            Color(side): make_player(controller_from_json(c), self._adapter, self._levels, game.id)
+            Color(side): make_player(controller_from_json(c), self._adapter, game.id)
             for side, c in game.controllers.items()
         }
 
@@ -106,12 +104,19 @@ class GameService:
         Вызывается из settings-update эндпоинта."""
         await self._retention.enforce_limits(owner_id)
 
-    async def create_game(self, owner_id: int, opponent_level: str, human_color: str) -> Game:
+    async def create_game(
+        self,
+        owner_id: int,
+        engine_ctl: Engine,
+        human_color: str,
+    ) -> Game:
+        """Создать партию. engine_ctl — замороженный снимок конфига движка
+        (level_id + strength + timeout_ms + nnue)."""
         human = Color(human_color)
         engine_side = Color.WHITE if human is Color.BLACK else Color.BLACK
         controllers = {
             human.value: controller_to_json(User(owner_id)),
-            engine_side.value: controller_to_json(Engine(opponent_level)),
+            engine_side.value: controller_to_json(engine_ctl),
         }
         game = Game(
             id=str(uuid.uuid4()),

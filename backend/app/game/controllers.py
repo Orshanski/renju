@@ -4,6 +4,9 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class Engine:
     level_id: str
+    strength: int
+    timeout_ms: int
+    nnue: bool
 
 
 @dataclass(frozen=True)
@@ -16,12 +19,20 @@ Controller = Engine | User
 
 def controller_to_json(c: Controller) -> dict:
     if isinstance(c, Engine):
-        return {"kind": "engine", "level_id": c.level_id}
+        return {
+            "kind": "engine",
+            "level_id": c.level_id,
+            "strength": c.strength,
+            "timeout_ms": c.timeout_ms,
+            "nnue": c.nnue,
+        }
     return {"kind": "user", "user_id": c.user_id}
 
 
 def controller_from_json(d: dict) -> Controller:
-    return Engine(d["level_id"]) if d["kind"] == "engine" else User(d["user_id"])
+    if d["kind"] == "engine":
+        return Engine(d["level_id"], d["strength"], d["timeout_ms"], d["nnue"])
+    return User(d["user_id"])
 
 
 def _engines(controllers: dict) -> list[Engine]:
@@ -45,6 +56,13 @@ def engine_level_tag(controllers: dict) -> str:
     for eng in _engines(controllers):
         return eng.level_id
     return "-"
+
+
+def engine_nnue(controllers: dict) -> bool | None:
+    """nnue-флаг из замороженного конфига engine-стороны; None если engine-стороны нет."""
+    for eng in _engines(controllers):
+        return eng.nnue
+    return None
 
 
 def user_side(controllers: dict, user_id: int) -> str | None:

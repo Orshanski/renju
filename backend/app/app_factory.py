@@ -31,7 +31,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI):
         from .config import REPO_ROOT
         from .game.event_hub import InMemoryEventHub
-        from .levels_config import load_levels
         from .rapfi.registry import EngineRegistry
 
         engine = make_engine(settings)
@@ -64,7 +63,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             asyncio.create_task(_sweep_loop()) if registry is not None else None
         )
         app.state.event_hub = InMemoryEventHub()
-        app.state.levels = {lv.id: lv for lv in load_levels(settings.levels_file)}  # id → LevelInfo
 
         from .game.advance_manager import AdvanceManager
         from .game.deps import make_game_service
