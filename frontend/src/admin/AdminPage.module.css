@@ -1,0 +1,62 @@
+/* Каркас страницы админки — по prototype/index.html #screen-admin */
+@value sumi, sumiSoft, sumiFaint, vermillion, paper, washi, washi2, fontSerif, fontSans, r, shadowSm from "../styles/tokens.module.css";
+
+.wrap {
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.eyebrow {
+  font-family: fontSans;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: sumiFaint;
+  margin-bottom: 6px;
+}
+
+.title {
+  font-family: fontSerif;
+  font-size: 28px;
+  font-weight: 700;
+  color: sumi;
+  margin: 0 0 28px;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 2px solid rgba(60, 45, 25, 0.12);
+  margin-bottom: 32px;
+}
+
+.tabs button {
+  background: none;
+  border: none;
+  font-family: fontSans;
+  font-size: 14px;
+  color: sumiSoft;
+  cursor: pointer;
+  padding: 8px 18px 10px;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  letter-spacing: 0.3px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tabs button:hover {
+  color: sumi;
+}
+
+.active {
+  color: sumi !important;
+  border-bottom-color: vermillion !important;
+  font-weight: 600;
+}
+
+.stub {
+  color: sumiFaint;
+  font-family: fontSans;
+  font-size: 15px;
+  padding: 32px 0;
+}
