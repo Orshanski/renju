@@ -1,5 +1,5 @@
 /* Экран «Движок» — по prototype/index.html #atab-engine */
-@value sumi, sumiSoft, sumiFaint, vermillion, vermillionDeep, paper, washi2, woodEdge, okGreen, r, rInput, fontSerif, fontSans, shadowSm from "../styles/tokens.module.css";
+@value sumi, sumiSoft, sumiFaint, vermillion, vermillionDeep, paper, okGreen, r, rInput, fontSans from "../styles/tokens.module.css";
 
 .sub {
   color: sumiSoft;

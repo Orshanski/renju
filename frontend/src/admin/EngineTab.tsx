@@ -45,8 +45,10 @@ export function EngineTab() {
   if (err && !rows) return <p className={styles.sub}>{err}</p>;
   if (!rows) return <p className={styles.sub}>Загрузка…</p>;
 
-  const setRow = (id: string, patch: Partial<Row>) =>
+  const setRow = (id: string, patch: Partial<Row>) => {
+    setSaved(false); // правка → снять отметку «Сохранено» (иначе висит при несохранённых)
     setRows((rs) => rs!.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  };
 
   return (
     <div>
@@ -98,7 +100,7 @@ export function EngineTab() {
           aria-checked={nnue}
           aria-label="Нейросеть"
           className={nnue ? `${styles.toggle} ${styles.on}` : styles.toggle}
-          onClick={() => setNnue((v) => !v)}
+          onClick={() => { setNnue((v) => !v); setSaved(false); }}
         />
       </div>
       <div className={styles.actions}>
