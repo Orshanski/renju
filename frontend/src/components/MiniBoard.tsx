@@ -1,6 +1,7 @@
 import { HOSHI, at } from "../game/boardGeometry";
 import type { Point } from "../game/types";
 import styles from "./MiniBoard.module.css";
+import { BoardGrid } from "./board/BoardGrid";
 
 // Статичная миниатюра РЕАЛЬНОЙ позиции для карточки партии — настоящие ходы из
 // сводки, без интерактива/ховеров/нодов. Геометрия — общий boardGeometry, поэтому
@@ -11,7 +12,7 @@ export function MiniBoard({ moves }: { moves: Point[] }) {
   const lastIdx = moves.length - 1;
   return (
     <div className={styles.mini} aria-hidden="true">
-      <div className={styles.grid} />
+      <BoardGrid lineWidth="0.5px" />
       {HOSHI.map((p) => (
         <div key={`h${p[0]}-${p[1]}`} className={styles.hoshi} style={at(p)} />
       ))}

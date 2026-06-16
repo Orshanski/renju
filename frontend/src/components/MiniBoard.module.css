@@ -15,17 +15,6 @@
   background-position: center;
   box-shadow: inset 0 0 0 1px rgba(120, 80, 40, 0.3);
 }
-.grid {
-  position: absolute;
-  left: 5.0676%;
-  top: 5.0676%;
-  width: calc(89.8648% + 1px); /* +1px замыкает последнюю линию (приём прототипа) */
-  height: calc(89.8648% + 1px);
-  background-image:
-    linear-gradient(lineInk 0.5px, transparent 0.5px),
-    linear-gradient(90deg, lineInk 0.5px, transparent 0.5px);
-  background-size: calc((100% - 1px) / 14) calc((100% - 1px) / 14);
-}
 .hoshi {
   position: absolute;
   width: 1.4%;
