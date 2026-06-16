@@ -1,16 +1,24 @@
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import styles from "./Shell.module.css";
 
-// Каркас — по prototype/index.html §App chrome (бренд + юзерчип; табы появятся со срезами 2–5).
+// Каркас — по prototype/index.html §App chrome (бренд + навбар + юзерчип).
 export function Shell() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
 
   async function onLogout() {
     await logout();
     navigate("/login", { replace: true }); // явно: logout самодостаточен; ProtectedRoute-редирект — бэкстоп
   }
+
+  // Активная вкладка: Админ → /admin*, Настройки → /settings*, Партии — дефолт
+  const activeTab = pathname.startsWith("/admin")
+    ? "admin"
+    : pathname.startsWith("/settings")
+      ? "settings"
+      : "games";
 
   return (
     <div className={styles.shell}>
@@ -33,14 +41,36 @@ export function Shell() {
           <span className={styles.kanji}>連珠</span>
           <span className={styles.lat}>Renju</span>
         </div>
+        <nav className={styles.tabs}>
+          <button
+            className={`${styles.tab}${activeTab === "games" ? ` ${styles.active}` : ""}`}
+            aria-current={activeTab === "games" ? "page" : undefined}
+            onClick={() => navigate("/")}
+          >
+            Партии
+          </button>
+          <button
+            className={`${styles.tab}${activeTab === "settings" ? ` ${styles.active}` : ""}`}
+            aria-current={activeTab === "settings" ? "page" : undefined}
+            onClick={() => navigate("/settings")}
+          >
+            Настройки
+          </button>
+          {user?.role === "admin" && (
+            <button
+              className={`${styles.tab}${activeTab === "admin" ? ` ${styles.active}` : ""}`}
+              aria-current={activeTab === "admin" ? "page" : undefined}
+              onClick={() => navigate("/admin")}
+            >
+              Админ
+            </button>
+          )}
+        </nav>
         <div className={styles.spacer} />
         <div className={styles.userchip}>
           {/* ?. — гейт ProtectedRoute гарантирует user; страховка, не флоу */}
           <span className={styles.av}>{user?.username.charAt(0).toUpperCase()}</span>
           <span>{user?.username}</span>
-          {user?.role === "admin" && (
-            <button className={styles.linkbtn} onClick={() => navigate("/admin")}>Админ</button>
-          )}
           <button className={styles.linkbtn} onClick={onLogout}>выйти</button>
         </div>
       </header>

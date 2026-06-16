@@ -12,6 +12,7 @@ const HomePage = lazy(() => import("./pages/HomePage"));
 const GamePage = lazy(() => import("./pages/GamePage"));
 const NewGamePage = lazy(() => import("./pages/NewGamePage"));
 const AdminPage = lazy(() => import("./admin/AdminPage"));
+const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 
 function UnauthorizedBridge() {
   const navigate = useNavigate();
@@ -37,6 +38,7 @@ export default function App() {
                 <Route path="/" element={<HomePage />} />
                 <Route path="/new" element={<NewGamePage />} />
                 <Route path="/game/:gameId" element={<GamePage />} />
+                <Route path="/settings" element={<SettingsPage />} />
                 <Route element={<AdminRoute />}>
                   <Route path="/admin" element={<AdminPage />} />
                 </Route>
