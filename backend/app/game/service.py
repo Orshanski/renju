@@ -18,7 +18,7 @@ from ..exceptions import ConflictError, NotFoundError
 from ..models.game import Game
 from ..rapfi.adapter import EngineError
 from ._time import _now
-from .controllers import Engine, User, controller_from_json, controller_to_json
+from .controllers import Engine, User, controller_from_json, controller_to_json, engine_nnue
 from .moves import apply_move
 from .players import Player, make_player
 from .ports import EngineAdapter, EventHub
@@ -58,7 +58,9 @@ class GameService:
         if key in log:
             return [tuple(p) for p in log[key]]
         if color_to_move(len(moves)) is Color.BLACK:
-            pts = await self._adapter.forbidden_points(game.id, moves, level_tag="-")
+            pts = await self._adapter.forbidden_points(
+                game.id, moves, level_tag="-", nnue=engine_nnue(game.controllers)
+            )
         else:
             pts = []
         game.forbidden_log = {**log, key: [list(p) for p in pts]}  # переприсвоить (JSON-mutation)

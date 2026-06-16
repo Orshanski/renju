@@ -29,7 +29,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        from .config import REPO_ROOT
         from .game.event_hub import InMemoryEventHub
         from .rapfi.registry import EngineRegistry
 
@@ -40,7 +39,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             app.state.adapter = EngineRegistry(  # процесс на партию (rj-899)
                 bin_path=settings.resolved_rapfi_bin(),
                 config_path=settings.rapfi_config,
-                cwd=REPO_ROOT,
+                cwd=settings.rapfi_config.parent,
+                data_dir=settings.data_dir,
                 idle_timeout_s=settings.engine_idle_timeout_s,
                 kill_grace_s=settings.engine_kill_grace_s,
             )

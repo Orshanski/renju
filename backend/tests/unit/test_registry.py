@@ -1,4 +1,5 @@
 import asyncio
+from pathlib import Path
 
 import pytest
 
@@ -7,9 +8,19 @@ from app.rapfi.registry import EngineRegistry
 
 P = EngineParams(strength=50, timeout_turn_ms=200)
 
+# Минимальный валидный TOML-конфиг движка (без секции evaluator — тест nnue=False её дропает)
+_BASE_TOML = """\
+[gomocup]
+name = "Rapfi"
+
+[model]
+type = "mix9"
+"""
+
 
 class FakeProc:
-    """Фейк RapfiProcess: отдаёт заданные строки; пустой script → зависание (hang-тест)."""
+    """Фейк RapfiProcess: отдаёт заданные строки; пустой script → зависание (hang-тест).
+    Фиксирует config_path переданный при spawn."""
 
     _seq = 1000
 
@@ -17,6 +28,7 @@ class FakeProc:
         self._script = list(script)
         self.sent = []
         self._alive = True
+        self.spawned_config: Path | None = None
         FakeProc._seq += 1
         self.pid = FakeProc._seq
 
@@ -36,8 +48,26 @@ class FakeProc:
         self._alive = False
 
 
-def make_registry(spawn, **kw):
-    d = dict(bin_path="/x", config_path="/y", cwd="/z", idle_timeout_s=100.0, kill_grace_s=0.01)
+def make_registry(spawn, *, tmp_path: Path | None = None, **kw):
+    """Фабрика реестра для юнит-тестов.
+
+    tmp_path (pytest fixture) нужен для тестов, проверяющих per-game config (nnue).
+    Если не передан — создаём registry без реального data_dir (nnue-тесты его требуют явно).
+    """
+    import tempfile
+
+    data_dir = tmp_path if tmp_path is not None else Path(tempfile.mkdtemp())
+    config_file = data_dir / "config.toml"
+    if not config_file.exists():
+        config_file.write_text(_BASE_TOML)
+    d = dict(
+        bin_path="/x",
+        config_path=config_file,
+        cwd="/z",
+        idle_timeout_s=100.0,
+        kill_grace_s=0.01,
+        data_dir=data_dir,
+    )
     d.update(kw)
     return EngineRegistry(spawn=spawn, **d)
 
@@ -512,4 +542,126 @@ async def test_logs_carry_game_and_pid(caplog):
     text = "\n".join(r.getMessage() for r in caplog.records)
     assert "game-xyz" in text and "pid=" in text
     assert "spawn" in text and "compute_move" in text and "kill" in text
+    await reg.close()
+
+
+# --- B3b: per-game config (nnue) ---
+
+
+@pytest.mark.asyncio
+async def test_spawn_with_nnue_uses_per_game_config(tmp_path):
+    """compute_move с nnue=True → спавн под per-game TOML, не под self._config."""
+    spawned_configs: list[Path] = []
+
+    async def spawn(*, bin_path, config_path, cwd, **kw):
+        p = FakeProc(["8,8"])
+        p.spawned_config = config_path
+        spawned_configs.append(config_path)
+        return p
+
+    reg = make_registry(spawn, tmp_path=tmp_path)
+    await reg.compute_move("game-nnue", [(7, 7)], P, nnue=True)
+
+    # Спавн должен использовать per-game конфиг, а не глобальный шаблон
+    assert len(spawned_configs) == 1
+    used = spawned_configs[0]
+    global_cfg = tmp_path / "config.toml"
+    assert used != global_cfg
+    assert used == tmp_path / "engine_configs" / "game-nnue.toml"
+    assert used.exists()
+
+    # slot.config_path зафиксирован
+    assert reg._slots["game-nnue"].config_path == used
+    await reg.close()
+
+
+@pytest.mark.asyncio
+async def test_spawn_with_nnue_false_drops_evaluator(tmp_path):
+    """nnue=False → per-game TOML не содержит секцию evaluator."""
+    # Расширяем базовый TOML, добавив секцию evaluator
+    config_file = tmp_path / "config.toml"
+    evaluator_section = (
+        '\n[model.evaluator]\ntype = "mix9"\n[[model.evaluator.weights]]\npath = "w.bin"\n'
+    )
+    config_file.write_text(_BASE_TOML + evaluator_section)
+
+    async def spawn(*, bin_path, config_path, cwd, **kw):
+        p = FakeProc(["8,8"])
+        p.spawned_config = config_path
+        return p
+
+    reg = make_registry(spawn, tmp_path=tmp_path)
+    await reg.compute_move("game-no-nnue", [(7, 7)], P, nnue=False)
+
+    per_game = tmp_path / "engine_configs" / "game-no-nnue.toml"
+    assert per_game.exists()
+    content = per_game.read_text()
+    assert "[model.evaluator]" not in content
+    await reg.close()
+
+
+@pytest.mark.asyncio
+async def test_respawn_uses_slot_config_path(tmp_path):
+    """После форс-respawn слот переиспользует тот же config_path, не глобальный."""
+    spawned_configs: list[Path] = []
+
+    async def spawn(*, bin_path, config_path, cwd, **kw):
+        p = FakeProc(["8,8"])
+        spawned_configs.append(config_path)
+        return p
+
+    reg = make_registry(spawn, tmp_path=tmp_path)
+    # Первый спавн — через compute_move с nnue
+    await reg.compute_move("game-resp", [(7, 7)], P, nnue=True)
+    first_config = spawned_configs[0]
+    assert first_config == tmp_path / "engine_configs" / "game-resp.toml"
+
+    # Форс-respawn через _respawn (симулируем: убиваем процесс вручную)
+    slot = reg._slots["game-resp"]
+    async with slot.io_lock:
+        await reg._respawn(slot, "game-resp", reason="test")
+
+    # Второй спавн должен использовать тот же per-game config
+    assert len(spawned_configs) == 2
+    assert spawned_configs[1] == first_config
+    await reg.close()
+
+
+@pytest.mark.asyncio
+async def test_terminate_removes_config_file(tmp_path):
+    """После _terminate per-game TOML должен быть удалён."""
+
+    async def spawn(*, bin_path, config_path, cwd, **kw):
+        return FakeProc([])
+
+    reg = make_registry(spawn, tmp_path=tmp_path)
+    await reg.mark_present("game-term", nnue=True)
+
+    per_game = tmp_path / "engine_configs" / "game-term.toml"
+    assert per_game.exists(), "per-game config should exist after spawn"
+
+    await reg.mark_absent("game-term")  # presence 1→0 → _terminate
+
+    assert not per_game.exists(), "per-game config should be removed after _terminate"
+    await reg.close()
+
+
+@pytest.mark.asyncio
+async def test_nnue_none_spawns_under_global_config(tmp_path):
+    """nnue=None → спавн под глобальный self._config, per-game файл не создаётся."""
+    spawned_configs: list[Path] = []
+
+    async def spawn(*, bin_path, config_path, cwd, **kw):
+        p = FakeProc(["8,8"])
+        spawned_configs.append(config_path)
+        return p
+
+    reg = make_registry(spawn, tmp_path=tmp_path)
+    global_cfg = tmp_path / "config.toml"
+    await reg.compute_move("game-no-nnue-flag", [(7, 7)], P)  # nnue не передан → None
+
+    assert spawned_configs[0] == global_cfg
+    per_game_dir = tmp_path / "engine_configs"
+    # Директория либо не создана, либо файла нет
+    assert not (per_game_dir / "game-no-nnue-flag.toml").exists()
     await reg.close()

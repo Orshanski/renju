@@ -22,10 +22,12 @@ class FakeAdapter:
         self.move = (8, 8)
         self.undo_syncs = []
 
-    async def forbidden_points(self, game_id, moves, *, level_tag="-"):
+    async def forbidden_points(self, game_id, moves, *, level_tag="-", nnue=None):
         return list(self.forbid)
 
-    async def compute_move(self, game_id, moves, params, allowed_zone=None, *, level_tag="-"):
+    async def compute_move(
+        self, game_id, moves, params, allowed_zone=None, *, level_tag="-", nnue=None
+    ):
         return self.move
 
     async def sync_after_undo(self, game_id, moves, *, level_tag="-"):
@@ -51,7 +53,7 @@ async def test_fouls_memoized_one_engine_call():
     svc._adapter.calls = 0
     orig = svc._adapter.forbidden_points
 
-    async def counting(game_id, moves, *, level_tag="-"):
+    async def counting(game_id, moves, *, level_tag="-", nnue=None):
         svc._adapter.calls += 1
         return await orig(game_id, moves, level_tag=level_tag)
 
@@ -137,7 +139,7 @@ async def test_advance_engine_error_publishes_error_event():
 
     svc = _svc()
 
-    async def boom(game_id, moves, params, allowed_zone=None, *, level_tag="-"):
+    async def boom(game_id, moves, params, allowed_zone=None, *, level_tag="-", nnue=None):
         raise EngineError("twice")
 
     svc._adapter.compute_move = boom
@@ -206,7 +208,7 @@ async def test_undo_pure_replay_no_engine():
     svc._adapter.calls = 0
     orig = svc._adapter.forbidden_points
 
-    async def counting(game_id, m):
+    async def counting(game_id, m, **kw):
         svc._adapter.calls += 1
         return await orig(game_id, m)
 
@@ -276,7 +278,7 @@ async def test_undo_no_engine_even_with_sparse_log():
     svc._adapter.calls = 0
     orig = svc._adapter.forbidden_points
 
-    async def counting(game_id, m):
+    async def counting(game_id, m, **kw):
         svc._adapter.calls += 1
         return await orig(game_id, m)
 
@@ -305,7 +307,7 @@ async def test_advance_engine_black_does_not_query_fouls():
     svc._adapter.calls = 0
     orig = svc._adapter.forbidden_points
 
-    async def counting(game_id, moves, *, level_tag="-"):
+    async def counting(game_id, moves, *, level_tag="-", nnue=None):
         svc._adapter.calls += 1
         return await orig(game_id, moves, level_tag=level_tag)
 
@@ -337,10 +339,12 @@ async def test_eve_advance_drives_both_engine_sides():
         def __init__(self):
             self.i = 0
 
-        async def forbidden_points(self, game_id, moves, *, level_tag="-"):
+        async def forbidden_points(self, game_id, moves, *, level_tag="-", nnue=None):
             return []
 
-        async def compute_move(self, game_id, moves, params, allowed_zone=None, *, level_tag="-"):
+        async def compute_move(
+            self, game_id, moves, params, allowed_zone=None, *, level_tag="-", nnue=None
+        ):
             mv = seq[self.i]
             self.i += 1
             return mv

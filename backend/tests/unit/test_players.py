@@ -25,7 +25,9 @@ async def test_engine_player_passes_game_id():
     captured = {}
 
     class FakeReg:
-        async def compute_move(self, game_id, moves, params, allowed_zone=None, *, level_tag="-"):
+        async def compute_move(
+            self, game_id, moves, params, allowed_zone=None, *, level_tag="-", nnue=None
+        ):
             captured["game_id"] = game_id
             captured["level_tag"] = level_tag
             return (7, 8)

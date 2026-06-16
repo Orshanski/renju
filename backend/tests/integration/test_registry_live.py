@@ -12,9 +12,14 @@ from app.rapfi.registry import EngineRegistry
 P = EngineParams(strength=5, timeout_turn_ms=1000)
 
 
-def _reg(rapfi_paths):
+def _reg(rapfi_paths, tmp_path=None):
+    import tempfile
+
     b, c, cwd = rapfi_paths
-    return EngineRegistry(bin_path=b, config_path=c, cwd=cwd, idle_timeout_s=100.0)
+    data_dir = tmp_path if tmp_path is not None else Path(tempfile.mkdtemp())
+    return EngineRegistry(
+        bin_path=b, config_path=c, cwd=cwd, idle_timeout_s=100.0, data_dir=data_dir
+    )
 
 
 _DIRS = [(1, 0), (0, 1), (1, 1), (1, -1)]
@@ -297,7 +302,7 @@ async def test_recovers_after_engine_crash(rapfi_paths):
         await reg.close()
 
 
-async def test_hanging_engine_killed_by_wall_clock(rapfi_paths):
+async def test_hanging_engine_killed_by_wall_clock(rapfi_paths, tmp_path):
     """Зависший движок убивается по wall-clock и поднимает EngineError."""
     _, config_path, cwd = rapfi_paths
     hang = Path(__file__).parent / "fixtures" / "hang_engine.sh"
@@ -307,6 +312,7 @@ async def test_hanging_engine_killed_by_wall_clock(rapfi_paths):
         cwd=cwd,
         idle_timeout_s=100,
         wall_clock_slack_s=0.2,
+        data_dir=tmp_path,
     )
     try:
         params = EngineParams(strength=100, timeout_turn_ms=200)

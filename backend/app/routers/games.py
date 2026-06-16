@@ -15,7 +15,7 @@ from ..domain.errors import MoveRejected, UndoRejected
 from ..domain.retention import Section, game_section
 from ..domain.values import GameStatus
 from ..exceptions import BadInputError
-from ..game.controllers import Engine, engine_level_tag
+from ..game.controllers import Engine, engine_level_tag, engine_nnue
 from ..game.deps import build_game_service, make_game_service
 from ..game.dtos import CreateGameBody, GameSummaryDTO, LevelDTO
 from ..game.mappers import state_payload, summary_dto
@@ -190,7 +190,9 @@ async def enter(
     game = await service.get_game(game_id, user.user_id)  # 404 если нет доступа
     adapter = request.app.state.adapter
     if adapter is not None:
-        await adapter.mark_present(game_id, engine_level_tag(game.controllers))
+        await adapter.mark_present(
+            game_id, engine_level_tag(game.controllers), nnue=engine_nnue(game.controllers)
+        )
     return {"ok": True}
 
 

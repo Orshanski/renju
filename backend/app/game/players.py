@@ -22,15 +22,24 @@ class InteractivePlayer:
 
 class EnginePlayer:
     def __init__(
-        self, adapter: EngineAdapter, params: EngineParams, game_id: str, level_tag: str = "-"
+        self,
+        adapter: EngineAdapter,
+        params: EngineParams,
+        game_id: str,
+        level_tag: str = "-",
+        *,
+        nnue: bool | None = None,
     ):
         self._adapter = adapter
         self._params = params
         self._game_id = game_id
         self._level_tag = level_tag
+        self._nnue = nnue
 
     async def take_turn(self, moves: Sequence[Point]) -> Point | None:
-        return await engine_move(self._adapter, moves, self._params, self._game_id, self._level_tag)
+        return await engine_move(
+            self._adapter, moves, self._params, self._game_id, self._level_tag, nnue=self._nnue
+        )
 
 
 def make_player(ctl: Controller, adapter: EngineAdapter, game_id: str) -> Player:
@@ -39,4 +48,4 @@ def make_player(ctl: Controller, adapter: EngineAdapter, game_id: str) -> Player
     assert isinstance(ctl, Engine)
     # Параметры берём из замороженного снимка контроллера, не из глобального словаря уровней
     params = EngineParams(strength=ctl.strength, timeout_turn_ms=ctl.timeout_ms)
-    return EnginePlayer(adapter, params, game_id, level_tag=ctl.level_id)
+    return EnginePlayer(adapter, params, game_id, level_tag=ctl.level_id, nnue=ctl.nnue)
