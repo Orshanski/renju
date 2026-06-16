@@ -1,0 +1,264 @@
+/* Экран «Пользователи» — по prototype/index.html #atab-users */
+@value sumi, sumiSoft, sumiFaint, vermillion, vermillionDeep, paper, okGreen, r, rInput, fontSans from "../styles/tokens.module.css";
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.addBtn {
+  padding: 8px 20px;
+  background: vermillion;
+  color: #fff;
+  border: none;
+  border-radius: r;
+  font-family: fontSans;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.3px;
+  transition: background 0.15s;
+}
+
+.addBtn:hover {
+  background: vermillionDeep;
+}
+
+.sub {
+  color: sumiSoft;
+  font-family: fontSans;
+  font-size: 14px;
+  margin: 0 0 24px;
+}
+
+.tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: fontSans;
+  font-size: 14px;
+}
+
+.tbl th {
+  text-align: left;
+  color: sumiFaint;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  padding: 0 12px 10px 0;
+  border-bottom: 1px solid rgba(60, 45, 25, 0.12);
+}
+
+.tbl td {
+  padding: 10px 12px 10px 0;
+  border-bottom: 1px solid rgba(60, 45, 25, 0.07);
+  color: sumi;
+  vertical-align: middle;
+}
+
+.roleBadge {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: fontSans;
+}
+
+.roleBadge[data-role="admin"] {
+  background: rgba(189, 51, 38, 0.12);
+  color: vermillionDeep;
+}
+
+.roleBadge[data-role="user"] {
+  background: rgba(60, 45, 25, 0.08);
+  color: sumiSoft;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.actionBtn {
+  padding: 5px 12px;
+  background: transparent;
+  border: 1px solid rgba(60, 45, 25, 0.25);
+  border-radius: rInput;
+  font-family: fontSans;
+  font-size: 13px;
+  color: sumiSoft;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.actionBtn:hover {
+  border-color: vermillion;
+  color: vermillion;
+}
+
+.actionBtnDanger {
+  composes: actionBtn;
+  color: vermillion;
+  border-color: rgba(189, 51, 38, 0.35);
+}
+
+.actionBtnDanger:hover {
+  background: rgba(189, 51, 38, 0.06);
+  border-color: vermillion;
+}
+
+/* Модалка */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(36, 29, 22, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal {
+  background: paper;
+  border-radius: r;
+  padding: 28px 32px;
+  min-width: 320px;
+  max-width: 440px;
+  width: 100%;
+  box-shadow: 0 18px 40px -18px rgba(40, 28, 14, 0.55);
+}
+
+.modalTitle {
+  font-family: fontSans;
+  font-size: 17px;
+  font-weight: 700;
+  color: sumi;
+  margin: 0 0 20px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.field label {
+  font-family: fontSans;
+  font-size: 13px;
+  color: sumiFaint;
+  font-weight: 600;
+}
+
+.field input[type="text"],
+.field input[type="password"] {
+  padding: 8px 12px;
+  border: 1px solid rgba(60, 45, 25, 0.25);
+  border-radius: rInput;
+  font-family: fontSans;
+  font-size: 14px;
+  color: sumi;
+  background: #fff;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.field input:focus {
+  border-color: vermillion;
+}
+
+.roleGroup {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.roleChoice {
+  flex: 1;
+  padding: 8px 0;
+  border: 1px solid rgba(60, 45, 25, 0.25);
+  border-radius: rInput;
+  font-family: fontSans;
+  font-size: 14px;
+  color: sumiSoft;
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.roleChoice:hover {
+  border-color: vermillion;
+  color: vermillion;
+}
+
+.roleChoiceActive {
+  composes: roleChoice;
+  border-color: vermillion;
+  color: vermillion;
+  background: rgba(189, 51, 38, 0.07);
+  font-weight: 600;
+}
+
+.errMsg {
+  color: vermillion;
+  font-family: fontSans;
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+
+.modalFooter {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.cancelBtn {
+  padding: 9px 20px;
+  background: transparent;
+  border: 1px solid rgba(60, 45, 25, 0.25);
+  border-radius: r;
+  font-family: fontSans;
+  font-size: 14px;
+  color: sumiSoft;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.cancelBtn:hover {
+  border-color: sumi;
+}
+
+.submitBtn {
+  padding: 9px 22px;
+  background: vermillion;
+  color: #fff;
+  border: none;
+  border-radius: r;
+  font-family: fontSans;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.submitBtn:hover:not(:disabled) {
+  background: vermillionDeep;
+}
+
+.submitBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.dangerBtn {
+  composes: submitBtn;
+  background: vermillionDeep;
+}
+
+.dangerBtn:hover:not(:disabled) {
+  background: vermillion;
+}
