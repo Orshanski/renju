@@ -1,0 +1,5 @@
+@value lineInk from "../../styles/tokens.module.css";
+.grid { position: absolute; inset: 0; pointer-events: none; }
+/* линия центрируется на pos(i) (translate -50%), как центр камня → совпадают */
+.v { position: absolute; background: lineInk; transform: translateX(-50%); }
+.h { position: absolute; background: lineInk; transform: translateY(-50%); }

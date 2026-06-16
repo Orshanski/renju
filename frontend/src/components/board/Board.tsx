@@ -2,6 +2,7 @@ import { pointLabel } from "../../game/legality";
 import { N, PAD, STEP, HOSHI, at } from "../../game/boardGeometry";
 import type { Color, Point } from "../../game/types";
 import styles from "./Board.module.css";
+import { BoardGrid } from "./BoardGrid";
 
 // Геометрия гобана (N/PAD/STEP/HOSHI/at) — общий boardGeometry, percent-based fluid (спека §«Геометрия»).
 const CELLS: Point[] = [];
@@ -37,7 +38,7 @@ export function Board({ moves, forbidden, zone, winningLine, ghostColor, canPlay
   const lastIdx = moves.length - 1;
   return (
     <div className={styles.goban}>
-      <div className={styles.gridLines} />
+      <BoardGrid />
       {HOSHI.map((p) => (
         <div key={`h${p[0]}-${p[1]}`} className={styles.hoshi} style={at(p)} />
       ))}
