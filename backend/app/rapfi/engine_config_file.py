@@ -72,8 +72,9 @@ def _drop_evaluator_section(toml_text: str) -> str:
     for line in lines:
         stripped = line.strip()
 
-        # Detect start of the evaluator block
-        if stripped in ("[model.evaluator]",) or stripped.startswith("[[model.evaluator."):
+        # Detect start of the evaluator block (startswith — терпимо к трейлинг-комменту
+        # вида "[model.evaluator] # ...", который точное сравнение пропустило бы)
+        if stripped.startswith("[model.evaluator]") or stripped.startswith("[[model.evaluator."):
             skip = True
             continue
 

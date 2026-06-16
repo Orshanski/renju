@@ -665,3 +665,20 @@ async def test_nnue_none_spawns_under_global_config(tmp_path):
     # Директория либо не создана, либо файла нет
     assert not (per_game_dir / "game-no-nnue-flag.toml").exists()
     await reg.close()
+
+
+@pytest.mark.asyncio
+async def test_spawn_failure_removes_assembled_config(tmp_path):
+    """Спавн упал при nnue=True: собранный per-game TOML не должен осиротеть.
+    Слот изъят и до _terminate не дойдёт → файл убираем прямо в except-ветке _spawn_into."""
+
+    async def spawn(*, bin_path, config_path, cwd, **kw):
+        raise OSError("spawn boom")
+
+    reg = make_registry(spawn, tmp_path=tmp_path)
+    per_game = tmp_path / "engine_configs" / "game-fail.toml"
+    with pytest.raises(Exception):  # noqa: B017 — нам важен сам факт провала, не тип
+        await reg.compute_move("game-fail", [(7, 7)], P, nnue=True)
+    assert not per_game.exists(), "осиротевший per-game config после провала спавна"
+    assert "game-fail" not in reg._slots
+    await reg.close()
