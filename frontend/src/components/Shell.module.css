@@ -36,9 +36,9 @@
   border-bottom: 1px solid rgba(60, 45, 25, 0.16);
   background: linear-gradient(#f4ecdb, #efe5cf);
 }
-.brand { display: flex; align-items: baseline; gap: 12px; cursor: pointer; }
-.kanji { font-family: fontSerif; font-weight: 800; font-size: 30px; letter-spacing: 2px; color: sumi; }
-.lat { font-family: fontSerif; font-weight: 600; letter-spacing: 7px; font-size: 13px; text-transform: uppercase; color: sumiSoft; transform: translateY(-3px); }
+.brand { display: flex; align-items: center; gap: 12px; cursor: pointer; }
+.kanji { font-family: fontSerif; font-weight: 800; font-size: 30px; line-height: 1; letter-spacing: 2px; color: sumi; }
+.lat { font-family: fontSerif; font-weight: 600; letter-spacing: 7px; font-size: 13px; text-transform: uppercase; color: sumiSoft; line-height: 1; }
 .spacer { flex: 1; }
 .userchip { display: flex; align-items: center; gap: 10px; color: sumiSoft; font-size: 14px; }
 .av {
