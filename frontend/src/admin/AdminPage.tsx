@@ -7,7 +7,7 @@ import styles from "./AdminPage.module.css";
 type Tab = "users" | "engine" | "health";
 
 export default function AdminPage() {
-  const [tab, setTab] = useState<Tab>("engine"); // рабочая вкладка по умолчанию
+  const [tab, setTab] = useState<Tab>("users");
   const { user, logout } = useAuth();
   return (
     <div className={styles.wrap}>

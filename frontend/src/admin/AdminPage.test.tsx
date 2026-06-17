@@ -9,9 +9,9 @@ vi.mock("../auth/AuthContext", () => ({
   useAuth: () => ({ user: { id: 1, username: "admin", role: "admin" }, loading: false, login: vi.fn(), logout: vi.fn() }),
 }));
 
-it("по умолчанию — вкладка Движок", async () => {
+it("по умолчанию — вкладка Пользователи", async () => {
   render(<AdminPage />);
-  expect(await screen.findByText("ENGINE TAB")).toBeInTheDocument();
+  expect(await screen.findByText("USERS TAB")).toBeInTheDocument();
 });
 
 it("вкладки переключаются — Пользователи рендерит UsersTab, Состояние — заглушка", async () => {
