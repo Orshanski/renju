@@ -876,6 +876,48 @@ async def test_undo_respects_policy_limit():
         await svc.undo(g.id, user_id=1)  # второй undo → LIMIT_REACHED
 
 
+async def test_undo_respects_policy_after_game_end_disabled():
+    """Если undo_after_game_end=False, откат завершённой партии отклоняется."""
+    from datetime import datetime
+
+    import pytest
+
+    from app.domain.errors import UndoRejected
+    from app.models.game import Game
+    from app.models.user_settings import UserSettings
+
+    sr = InMemorySettingsRepository()
+    await sr.upsert(
+        UserSettings(
+            user_id=1,
+            games_limit=50,
+            games_limit_enabled=True,
+            undo_enabled=True,
+            undo_limit=None,
+            undo_after_game_end=False,
+        )
+    )
+    svc = _svc(settings_repo=sr)
+    now = datetime(2026, 1, 1, 12, 0, 0)
+    g = Game(
+        id="g",
+        owner_id=1,
+        controllers={"black": {"kind": "user", "user_id": 1}, "white": _MASTER_JSON},
+        moves=[[7, 7], [8, 8], [9, 9], [10, 10], [11, 11]],
+        status="finished_black",
+        undo_count=0,
+        forbidden_log={},
+        favorite=False,
+        finished_at=now,
+        created_at=now,
+        updated_at=now,
+    )
+    await svc._repo.create(g)
+
+    with pytest.raises(UndoRejected):
+        await svc.undo("g", user_id=1)  # завершена + after_game_end=False → GAME_FINISHED
+
+
 async def test_undo_resets_finished_at():
     """Партия доиграна (finished_at проставлен) → undo → finished_at снова None."""
     from datetime import datetime
