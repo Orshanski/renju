@@ -33,11 +33,23 @@ async def test_inmemory_upsert_and_get():
 
 async def test_inmemory_upsert_overwrites():
     r = InMemorySettingsRepository()
-    s1 = UserSettings(user_id=3, games_limit=10, games_limit_enabled=True,
-                      undo_enabled=True, undo_limit=None, undo_after_game_end=True)
+    s1 = UserSettings(
+        user_id=3,
+        games_limit=10,
+        games_limit_enabled=True,
+        undo_enabled=True,
+        undo_limit=None,
+        undo_after_game_end=True,
+    )
     await r.upsert(s1)
-    s2 = UserSettings(user_id=3, games_limit=100, games_limit_enabled=False,
-                      undo_enabled=False, undo_limit=5, undo_after_game_end=False)
+    s2 = UserSettings(
+        user_id=3,
+        games_limit=100,
+        games_limit_enabled=False,
+        undo_enabled=False,
+        undo_limit=5,
+        undo_after_game_end=False,
+    )
     await r.upsert(s2)
     got = await r.get_or_default(3)
     assert got.games_limit == 100
@@ -47,6 +59,7 @@ async def test_inmemory_upsert_overwrites():
 
 async def test_sql_get_or_default_no_row(session):
     from app.dal import users as udal
+
     uid = await udal.create_user(session, "bob_settings", "pw")
     await session.commit()
     r = SqlSettingsRepository(session)
@@ -61,11 +74,18 @@ async def test_sql_get_or_default_no_row(session):
 async def test_sql_upsert_and_get(session, engine):
     from app.dal import users as udal
     from app.db.session import make_sessionmaker
+
     uid = await udal.create_user(session, "carol_settings", "pw")
     await session.commit()
     r = SqlSettingsRepository(session)
-    settings = UserSettings(user_id=uid, games_limit=30, games_limit_enabled=True,
-                            undo_enabled=True, undo_limit=10, undo_after_game_end=False)
+    settings = UserSettings(
+        user_id=uid,
+        games_limit=30,
+        games_limit_enabled=True,
+        undo_enabled=True,
+        undo_limit=10,
+        undo_after_game_end=False,
+    )
     await r.upsert(settings)
     async with make_sessionmaker(engine)() as s2:
         got = await SqlSettingsRepository(s2).get_or_default(uid)
@@ -77,14 +97,27 @@ async def test_sql_upsert_and_get(session, engine):
 async def test_sql_upsert_overwrites(session, engine):
     from app.dal import users as udal
     from app.db.session import make_sessionmaker
+
     uid = await udal.create_user(session, "dave_settings", "pw")
     await session.commit()
     r = SqlSettingsRepository(session)
-    s1 = UserSettings(user_id=uid, games_limit=50, games_limit_enabled=True,
-                      undo_enabled=True, undo_limit=None, undo_after_game_end=True)
+    s1 = UserSettings(
+        user_id=uid,
+        games_limit=50,
+        games_limit_enabled=True,
+        undo_enabled=True,
+        undo_limit=None,
+        undo_after_game_end=True,
+    )
     await r.upsert(s1)
-    s2 = UserSettings(user_id=uid, games_limit=20, games_limit_enabled=False,
-                      undo_enabled=False, undo_limit=2, undo_after_game_end=False)
+    s2 = UserSettings(
+        user_id=uid,
+        games_limit=20,
+        games_limit_enabled=False,
+        undo_enabled=False,
+        undo_limit=2,
+        undo_after_game_end=False,
+    )
     await r.upsert(s2)
     async with make_sessionmaker(engine)() as s3:
         got = await SqlSettingsRepository(s3).get_or_default(uid)

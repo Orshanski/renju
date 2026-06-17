@@ -47,31 +47,40 @@ async def test_put_settings_saves_and_returns(app, client):
 
 async def test_put_settings_validates_limit_range(app, client):
     await _login(app, client)
-    r = await client.put("/api/settings", json={
-        "games_limit": 5,  # < 10 → 422
-        "games_limit_enabled": True,
-        "undo_enabled": True,
-        "undo_limit": None,
-        "undo_after_game_end": True,
-    })
+    r = await client.put(
+        "/api/settings",
+        json={
+            "games_limit": 5,  # < 10 → 422
+            "games_limit_enabled": True,
+            "undo_enabled": True,
+            "undo_limit": None,
+            "undo_after_game_end": True,
+        },
+    )
     assert r.status_code == 422
 
 
 async def test_change_password_wrong_current(app, client):
     await _login(app, client)
-    r = await client.put("/api/settings/password", json={
-        "current_password": "wrong",
-        "new_password": "newpass123",
-    })
+    r = await client.put(
+        "/api/settings/password",
+        json={
+            "current_password": "wrong",
+            "new_password": "newpass123",
+        },
+    )
     assert r.status_code == 400
 
 
 async def test_change_password_success_keeps_session(app, client):
     await _login(app, client)
-    r = await client.put("/api/settings/password", json={
-        "current_password": "pw",
-        "new_password": "newpass123",
-    })
+    r = await client.put(
+        "/api/settings/password",
+        json={
+            "current_password": "pw",
+            "new_password": "newpass123",
+        },
+    )
     assert r.status_code == 204
     # Текущая сессия должна работать (cookie обновлён)
     me = await client.get("/api/auth/me")
@@ -88,10 +97,13 @@ async def test_change_password_new_epoch_in_cookie(app, client):
     old_cookie = client.cookies.get("renju_token")
     old_epoch = decode_token(old_cookie, Settings()).get("tep", 0)
 
-    r = await client.put("/api/settings/password", json={
-        "current_password": "pw",
-        "new_password": "newpass123",
-    })
+    r = await client.put(
+        "/api/settings/password",
+        json={
+            "current_password": "pw",
+            "new_password": "newpass123",
+        },
+    )
     assert r.status_code == 204
 
     new_cookie = client.cookies.get("renju_token")
