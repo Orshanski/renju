@@ -15,6 +15,7 @@ from .middleware.security_headers import add_security_headers
 from .routers import admin as admin_router
 from .routers import auth as auth_router
 from .routers import games as games_router
+from .routers import settings as settings_router
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -101,6 +102,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(auth_router.router)
     app.include_router(admin_router.router)
     app.include_router(games_router.router)
+    app.include_router(settings_router.router)
 
     @app.get("/api/health")
     async def health():
