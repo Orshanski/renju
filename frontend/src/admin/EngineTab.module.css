@@ -119,26 +119,7 @@
 }
 
 .save {
-  padding: 10px 28px;
-  background: vermillion;
-  color: #fff;
-  border: none;
-  border-radius: r;
-  font-family: fontSans;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  letter-spacing: 0.3px;
-  transition: background 0.15s;
-}
-
-.save:hover:not(:disabled) {
-  background: vermillionDeep;
-}
-
-.save:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+  composes: btn from "../styles/layout.module.css";
 }
 
 .ok {

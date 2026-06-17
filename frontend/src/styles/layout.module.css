@@ -1,8 +1,25 @@
 /* Общий слой раскладки/типографики — единый источник по prototype/index.html.
    Потребители подтягивают классы через composes, добавляя свою специфику. */
-@value vermillion, sumiSoft, fontSerif from "./tokens.module.css";
+@value vermillion, vermillionDeep, sumiSoft, fontSerif, fontSans, r from "./tokens.module.css";
 
 .wrap { max-width: 1120px; margin: 0 auto; }
+
+/* Единая основная кнопка — по «＋ Завести пользователя» (UsersTab .addBtn). */
+.btn {
+  padding: 8px 20px;
+  background: vermillion;
+  color: #fff;
+  border: none;
+  border-radius: r;
+  font-family: fontSans;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn:hover:not(:disabled) { background: vermillionDeep; }
+.btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .eyebrow {
   font-family: fontSerif;

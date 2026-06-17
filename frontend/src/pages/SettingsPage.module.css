@@ -129,26 +129,8 @@
 
 /* Buttons */
 .saveBtn {
+  composes: btn from "../styles/layout.module.css";
   margin-top: 16px;
-  padding: 10px 24px;
-  background: vermillion;
-  color: #fff;
-  border: none;
-  border-radius: r;
-  font-family: fontSans;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.saveBtn:hover:not(:disabled) {
-  background: vermillionDeep;
-}
-
-.saveBtn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .dangerRowBtn {

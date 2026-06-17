@@ -18,22 +18,10 @@
 .sub { composes: sub from "../styles/layout.module.css"; }
 
 .newBtn {
-  font-family: fontSans;
-  font-weight: 500;
-  font-size: 15px;
-  letter-spacing: 0.5px;
-  cursor: pointer;
-  border: none;
-  border-radius: 11px;
-  padding: 14px 22px;
-  background: vermillion;
-  color: #fbeee6;
-  box-shadow: shadowSm;
-  transition: 0.18s;
+  composes: btn from "../styles/layout.module.css";
   white-space: nowrap;
   flex-shrink: 0;
 }
-.newBtn:hover { background: vermillionDeep; transform: translateY(-1px); }
 
 /* таб-бар разделов — по prototype/index.html §ADMIN (.admin-tabs): подчёркивание */
 .tabs {

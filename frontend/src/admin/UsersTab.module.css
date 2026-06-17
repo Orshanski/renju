@@ -9,21 +9,7 @@
 }
 
 .addBtn {
-  padding: 8px 20px;
-  background: vermillion;
-  color: #fff;
-  border: none;
-  border-radius: r;
-  font-family: fontSans;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  letter-spacing: 0.3px;
-  transition: background 0.15s;
-}
-
-.addBtn:hover {
-  background: vermillionDeep;
+  composes: btn from "../styles/layout.module.css";
 }
 
 .sub {
@@ -233,25 +219,7 @@
 }
 
 .submitBtn {
-  padding: 9px 22px;
-  background: vermillion;
-  color: #fff;
-  border: none;
-  border-radius: r;
-  font-family: fontSans;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.submitBtn:hover:not(:disabled) {
-  background: vermillionDeep;
-}
-
-.submitBtn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+  composes: btn from "../styles/layout.module.css";
 }
 
 .dangerBtn {
