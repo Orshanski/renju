@@ -1,7 +1,7 @@
 /* по prototype/index.html §GAME (panel/cards/thinking); notice — наш (доктрина рассинхрона) */
 @value sumi, sumiSoft, vermillion, indigo, r, shadowSm, fontSerif, fontSans, bpCompact from "../styles/tokens.module.css";
 
-.wrap { max-width: 1120px; margin: 0 auto; }
+.wrap { composes: wrap from "../styles/layout.module.css"; }
 .loading { color: sumiSoft; padding: 40px; text-align: center; }
 .back {
   display: inline-flex;
@@ -19,19 +19,7 @@
   transition: 0.18s;
 }
 .back:hover { color: vermillion; }
-.eyebrow {
-  font-family: fontSerif;
-  font-weight: 600;
-  letter-spacing: 5px;
-  text-transform: uppercase;
-  font-size: 11px;
-  color: vermillion;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 18px;
-}
-.eyebrow::before { content: ""; width: 26px; height: 1px; background: vermillion; display: inline-block; }
+.eyebrow { composes: eyebrow from "../styles/layout.module.css"; margin-bottom: 18px; }
 .layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 34px; align-items: start; }
 .boardShell { display: flex; justify-content: center; min-width: 0; }
 .boardShell > * { max-width: min(100%, calc(100dvh - 220px)); } /* квадрат к min-стороне вьюпорта (шапка+отступы ≈220px) */
