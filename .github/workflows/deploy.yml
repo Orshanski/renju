@@ -45,7 +45,8 @@ jobs:
           script: |
             set -e
             cd /opt/renju
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
             cd backend && uv sync --no-dev
             cd ../frontend && npm ci && npx vite build
             sudo systemctl restart renju
