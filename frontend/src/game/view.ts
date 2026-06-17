@@ -12,4 +12,5 @@ export type GameView = {
   winningLine: Point[] | null;
   cursor: number;
   opponentLevelId: string | null;
+  undoCount: number;
 };

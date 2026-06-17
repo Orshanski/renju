@@ -244,8 +244,14 @@ class GameService:
 
     async def undo(self, game_id: str, user_id: int) -> Game:
         game = await self._load_owned(game_id, user_id)
+        settings = await self._settings_repo.get_or_default(user_id)
+        policy = UndoPolicy(
+            enabled=settings.undo_enabled,
+            limit=settings.undo_limit,
+            after_game_end=settings.undo_after_game_end,
+        )
         check_undo(
-            policy=UndoPolicy(),
+            policy=policy,
             status=GameStatus(game.status),
             undo_count=game.undo_count,
         )
@@ -254,7 +260,7 @@ class GameService:
         )
         new_moves = undo_truncate(moves=[tuple(m) for m in game.moves], for_color=Color(my_side))
         k = len(new_moves)
-        await self._adapter.sync_after_undo(game.id, new_moves, level_tag="-")
+        await self._adapter.sync_after_undo(game.id, new_moves)
         game.moves = [list(p) for p in new_moves]
         game.forbidden_log = {key: v for key, v in game.forbidden_log.items() if int(key) <= k}
         game.undo_count += 1
@@ -291,3 +297,10 @@ class GameService:
         """Удаляет партию. Чужому/несуществующей → NotFoundError."""
         await self._load_owned(game_id, user_id)
         await self._repo.delete(game_id)
+
+    async def bulk_delete(self, user_id: int, section: Section) -> int:
+        """Удалить все партии пользователя в указанном разделе (current или finished)."""
+        games = await self._repo.list_by_owner(user_id)
+        ids = [g.id for g in games if game_section(g.status, g.favorite) is section]
+        await self._repo.delete_many(ids)
+        return len(ids)

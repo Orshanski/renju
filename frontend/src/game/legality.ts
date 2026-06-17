@@ -1,7 +1,10 @@
 // Чистое зеркало серверных правил ввода (app/domain/{opening,game}.py) — для UX.
 // Сервер остаётся последней инстанцией; рассинхрон лечится ресинхроном (спека).
 import type { Color, Point } from "./types";
+import type { UserSettings } from "../settings.api";
 import type { GameView } from "./view";
+
+export type UndoCfg = Pick<UserSettings, "undo_enabled" | "undo_limit" | "undo_after_game_end">;
 
 export const BOARD_SIZE = 15;
 const CX = 7; // центр (7,7) предзаполнен при создании партии
@@ -33,10 +36,13 @@ export function canPlay(view: GameView, point: Point): boolean {
   return zone === null || has(zone, point);
 }
 
-export function canUndo(view: GameView): boolean {
+export function canUndo(view: GameView, policy: UndoCfg): boolean {
   // зеркало undo_truncate (preset=1): нужен индекс k ≥ 1 чётности своего цвета
   if (view.pendingIndex !== null || view.status === "opponent_thinking") return false;
   if (view.yourColor === null) return false;
+  if (!policy.undo_enabled) return false;
+  if (view.status.startsWith("finished_") && !policy.undo_after_game_end) return false;
+  if (policy.undo_limit !== null && view.undoCount >= policy.undo_limit) return false;
   return view.moves.length >= (view.yourColor === "black" ? 3 : 2);
 }
 

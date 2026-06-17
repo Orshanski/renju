@@ -33,8 +33,8 @@ class FakeAdapter:
     ):
         return self.move
 
-    async def sync_after_undo(self, game_id, moves, *, level_tag="-"):
-        self.undo_syncs.append((game_id, [tuple(m) for m in moves], level_tag))
+    async def sync_after_undo(self, game_id, moves):
+        self.undo_syncs.append((game_id, [tuple(m) for m in moves]))
 
 
 def _svc(adapter=None, settings_repo=None):
@@ -149,7 +149,7 @@ async def test_advance_engine_error_publishes_error_event():
     async def boom(game_id, moves, params, allowed_zone=None, *, level_tag="-", nnue=None):
         raise EngineError("twice")
 
-    setattr(svc._adapter, 'compute_move', boom)
+    svc._adapter.compute_move = boom
     g = await _create_game(svc, owner_id=1, human_color="black")
     assert g.status == "opponent_thinking"
     await svc.advance(g)  # движок падает → error-событие, статус НЕ меняется (§4.8 доиграет позже)
@@ -225,7 +225,7 @@ async def test_undo_pure_replay_no_engine():
     # откат белых: снимаем ход 3 (движок) и ход 2 (человек) → назад к [[7,7]]
     assert g.moves == [[7, 7]] and "2" not in g.forbidden_log and "3" not in g.forbidden_log
     assert fake.calls == 0  # undo без движка
-    assert fake.undo_syncs == [(g.id, [(7, 7)], "-")]
+    assert fake.undo_syncs == [(g.id, [(7, 7)])]
 
 
 async def test_advance_recovers_and_is_idempotent():
@@ -256,7 +256,7 @@ async def test_advance_recovery_when_engine_move_already_applied():
         fake.calls += 1
         return await orig(*a, **k)
 
-    setattr(svc._adapter, 'compute_move', counting)
+    svc._adapter.compute_move = counting
     await svc.advance(g)  # позиция = ход человека → advance оседает на awaiting_move без движка
     assert g.moves == [[7, 7], [8, 8]] and g.status == "awaiting_move"
     assert fake.calls == 0  # движок НЕ дёрнут — ход не задвоен
@@ -396,10 +396,11 @@ async def test_finish_sets_finished_at_and_evicts_over_limit():
     await sr.upsert(
         UserSettings(
             user_id=1,
-            current_limit=10,
-            current_limit_enabled=True,
-            finished_limit=2,
-            finished_limit_enabled=True,
+            games_limit=2,
+            games_limit_enabled=True,
+            undo_enabled=True,
+            undo_limit=None,
+            undo_after_game_end=True,
         )
     )
     svc = _svc(settings_repo=sr)
@@ -489,10 +490,11 @@ async def test_create_evicts_current_over_limit():
     await sr.upsert(
         UserSettings(
             user_id=1,
-            current_limit=2,
-            current_limit_enabled=True,
-            finished_limit=50,
-            finished_limit_enabled=True,
+            games_limit=2,
+            games_limit_enabled=True,
+            undo_enabled=True,
+            undo_limit=None,
+            undo_after_game_end=True,
         )
     )
     svc = _svc(settings_repo=sr)
@@ -558,10 +560,11 @@ async def test_favorite_only_finished_and_exempt_from_limit():
     await sr.upsert(
         UserSettings(
             user_id=1,
-            current_limit=10,
-            current_limit_enabled=True,
-            finished_limit=1,  # лимит 1: без фаворита — вытеснение
-            finished_limit_enabled=True,
+            games_limit=1,
+            games_limit_enabled=True,
+            undo_enabled=True,
+            undo_limit=None,
+            undo_after_game_end=True,
         )
     )
     svc = _svc(settings_repo=sr)
@@ -658,10 +661,11 @@ async def test_unfavorite_returns_to_finished_and_rechecks_limit():
     await sr.upsert(
         UserSettings(
             user_id=1,
-            current_limit=10,
-            current_limit_enabled=True,
-            finished_limit=1,  # лимит 1 → при возврате из избранного вытеснение
-            finished_limit_enabled=True,
+            games_limit=1,
+            games_limit_enabled=True,
+            undo_enabled=True,
+            undo_limit=None,
+            undo_after_game_end=True,
         )
     )
     svc = _svc(settings_repo=sr)
@@ -744,10 +748,11 @@ async def test_enforce_limits_trims_both_sections():
     await sr.upsert(
         UserSettings(
             user_id=1,
-            current_limit=1,
-            current_limit_enabled=True,
-            finished_limit=1,
-            finished_limit_enabled=True,
+            games_limit=1,
+            games_limit_enabled=True,
+            undo_enabled=True,
+            undo_limit=None,
+            undo_after_game_end=True,
         )
     )
     svc = _svc(settings_repo=sr)
@@ -803,6 +808,195 @@ async def test_enforce_limits_trims_both_sections():
     # Выжившие — новейшие
     assert current_remaining[0].id == "cur1"  # delta=3, newer
     assert finished_remaining[0].id == "fin1"  # delta=2, newer
+
+
+async def test_undo_respects_policy_disabled():
+    """Если undo_enabled=False, undo должен отклоняться."""
+    import pytest
+
+    from app.domain.errors import UndoRejected
+    from app.models.user_settings import UserSettings
+
+    sr = InMemorySettingsRepository()
+    await sr.upsert(
+        UserSettings(
+            user_id=1,
+            games_limit=50,
+            games_limit_enabled=True,
+            undo_enabled=False,
+            undo_limit=None,
+            undo_after_game_end=True,
+        )
+    )
+    svc = _svc(settings_repo=sr)
+    fake = _fake(svc)
+    # human=WHITE, engine=BLACK; create → awaiting_move (белый-человек ходит)
+    g = await _create_game(svc, owner_id=1, human_color="white")
+    g = await svc.submit_move(g.id, user_id=1, point=(8, 8))
+    fake.move = (6, 6)
+    await svc.advance(g)  # движок-чёрный ходит → awaiting_move, есть что откатить
+    with pytest.raises(UndoRejected):
+        await svc.undo(g.id, user_id=1)  # отклонён: undo_enabled=False
+
+
+async def test_undo_respects_policy_limit():
+    """Если undo_limit=1, второй undo должен отклоняться."""
+    import pytest
+
+    from app.domain.errors import UndoRejected
+    from app.models.user_settings import UserSettings
+
+    sr = InMemorySettingsRepository()
+    await sr.upsert(
+        UserSettings(
+            user_id=1,
+            games_limit=50,
+            games_limit_enabled=True,
+            undo_enabled=True,
+            undo_limit=1,
+            undo_after_game_end=True,
+        )
+    )
+    svc = _svc(settings_repo=sr)
+    fake = _fake(svc)
+    # human=WHITE, engine=BLACK; create → awaiting_move
+    g = await _create_game(svc, owner_id=1, human_color="white")
+    g = await svc.submit_move(g.id, user_id=1, point=(8, 8))
+    fake.move = (6, 6)
+    await svc.advance(g)  # moves=[[7,7],[8,8],[6,6]], awaiting_move
+
+    await svc.undo(g.id, user_id=1)  # первый undo → ок, undo_count=1
+
+    g = await svc.get_game(g.id, user_id=1)
+    g = await svc.submit_move(g.id, user_id=1, point=(8, 8))
+    fake.move = (5, 5)
+    await svc.advance(g)
+
+    with pytest.raises(UndoRejected):
+        await svc.undo(g.id, user_id=1)  # второй undo → LIMIT_REACHED
+
+
+async def test_undo_respects_policy_after_game_end_disabled():
+    """Если undo_after_game_end=False, откат завершённой партии отклоняется."""
+    from datetime import datetime
+
+    import pytest
+
+    from app.domain.errors import UndoRejected
+    from app.models.game import Game
+    from app.models.user_settings import UserSettings
+
+    sr = InMemorySettingsRepository()
+    await sr.upsert(
+        UserSettings(
+            user_id=1,
+            games_limit=50,
+            games_limit_enabled=True,
+            undo_enabled=True,
+            undo_limit=None,
+            undo_after_game_end=False,
+        )
+    )
+    svc = _svc(settings_repo=sr)
+    now = datetime(2026, 1, 1, 12, 0, 0)
+    g = Game(
+        id="g",
+        owner_id=1,
+        controllers={"black": {"kind": "user", "user_id": 1}, "white": _MASTER_JSON},
+        moves=[[7, 7], [8, 8], [9, 9], [10, 10], [11, 11]],
+        status="finished_black",
+        undo_count=0,
+        forbidden_log={},
+        favorite=False,
+        finished_at=now,
+        created_at=now,
+        updated_at=now,
+    )
+    await svc._repo.create(g)
+
+    with pytest.raises(UndoRejected):
+        await svc.undo("g", user_id=1)  # завершена + after_game_end=False → GAME_FINISHED
+
+
+async def test_bulk_delete_current_only():
+    """bulk_delete(CURRENT) удаляет только текущие партии, не трогает finished и favorite."""
+    from datetime import datetime
+
+    from app.domain.retention import Section
+    from app.models.game import Game
+
+    svc = _svc()
+    now = datetime(2026, 1, 1, 12, 0, 0)
+    ctl = {"black": {"kind": "user", "user_id": 1}, "white": _MASTER_JSON}
+    moves_finished = [[7, 7], [8, 8], [9, 9], [10, 10], [11, 11]]
+
+    # Текущие (CURRENT): awaiting_move + opponent_thinking
+    g_cur1 = Game(
+        id="cur1",
+        owner_id=1,
+        controllers=ctl,
+        moves=[[7, 7]],
+        status="awaiting_move",
+        undo_count=0,
+        forbidden_log={},
+        favorite=False,
+        finished_at=None,
+        created_at=now,
+        updated_at=now,
+    )
+    g_cur2 = Game(
+        id="cur2",
+        owner_id=1,
+        controllers=ctl,
+        moves=[[7, 7], [8, 8]],
+        status="opponent_thinking",
+        undo_count=0,
+        forbidden_log={},
+        favorite=False,
+        finished_at=None,
+        created_at=now,
+        updated_at=now,
+    )
+    # Завершённая (FINISHED)
+    g_fin = Game(
+        id="fin1",
+        owner_id=1,
+        controllers=ctl,
+        moves=moves_finished,
+        status="finished_black",
+        undo_count=0,
+        forbidden_log={},
+        favorite=False,
+        finished_at=now,
+        created_at=now,
+        updated_at=now,
+    )
+    # Избранная (FAVORITE): завершённая + favorite=True
+    g_fav = Game(
+        id="fav1",
+        owner_id=1,
+        controllers=ctl,
+        moves=moves_finished,
+        status="finished_black",
+        undo_count=0,
+        forbidden_log={},
+        favorite=True,
+        finished_at=now,
+        created_at=now,
+        updated_at=now,
+    )
+    await svc._repo.create(g_cur1)
+    await svc._repo.create(g_cur2)
+    await svc._repo.create(g_fin)
+    await svc._repo.create(g_fav)
+
+    count = await svc.bulk_delete(user_id=1, section=Section.CURRENT)
+
+    assert count == 2, f"Expected 2 deleted, got {count}"
+    assert await svc._repo.get("cur1") is None, "cur1 (awaiting_move) должна быть удалена"
+    assert await svc._repo.get("cur2") is None, "cur2 (opponent_thinking) должна быть удалена"
+    assert await svc._repo.get("fin1") is not None, "fin1 (finished) НЕ должна быть удалена"
+    assert await svc._repo.get("fav1") is not None, "fav1 (favorite) НЕ должна быть удалена"
 
 
 async def test_undo_resets_finished_at():

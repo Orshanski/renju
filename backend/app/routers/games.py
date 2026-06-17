@@ -1,7 +1,7 @@
 import json as _json
 import logging
 import random
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
@@ -95,6 +95,15 @@ async def delete_game(
     service: Annotated[GameService, Depends(build_game_service)],
 ):
     await service.delete_game(game_id, user.user_id)
+
+
+@router.delete("/games", status_code=204)
+async def bulk_delete_games(
+    section: Literal["current", "finished"],
+    user: Annotated[CurrentUser, Depends(current_user)],
+    service: Annotated[GameService, Depends(build_game_service)],
+):
+    await service.bulk_delete(user.user_id, Section(section))
 
 
 @router.post("/games/{game_id}/favorite")

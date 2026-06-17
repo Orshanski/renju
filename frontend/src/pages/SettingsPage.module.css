@@ -1,9 +1,10 @@
-/* Стаб страницы Настроек — по образцу AdminPage.module.css */
-@value sumi, sumiSoft, sumiFaint, fontSerif, fontSans from "../styles/tokens.module.css";
+/* frontend/src/pages/SettingsPage.module.css */
+@value sumi, sumiSoft, sumiFaint, vermillion, vermillionDeep, paper, okGreen, r, rInput, fontSerif, fontSans, toggleKnob, stepperBtnBg, stepperBtnHover from "../styles/tokens.module.css";
 
 .wrap {
-  max-width: 860px;
+  max-width: 680px;
   margin: 0 auto;
+  padding: 0 0 48px;
 }
 
 .eyebrow {
@@ -23,9 +24,281 @@
   margin: 0 0 28px;
 }
 
-.stub {
+.sectionTitle {
+  font-family: fontSans;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: sumiFaint;
+  margin: 30px 0 14px;
+}
+
+.settings {
+  max-width: 680px;
+}
+
+.setrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 20px 0;
+  border-bottom: 1px solid rgba(60, 45, 25, 0.14);
+}
+
+.setrowLabel {
+  font-family: fontSerif;
+  font-weight: 600;
+  font-size: 16px;
+  color: sumi;
+}
+
+.setrowDesc {
+  color: sumiSoft;
+  font-family: fontSans;
+  font-size: 13.5px;
+  font-weight: 300;
+  margin-top: 3px;
+  max-width: 420px;
+}
+
+/* Toggle */
+.toggle {
+  width: 52px;
+  height: 30px;
+  border-radius: 30px;
+  background: rgba(60, 45, 25, 0.22);
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.toggle::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: toggleKnob;
+  transition: left 0.2s;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.toggleOn {
+  composes: toggle;
+  background: okGreen;
+}
+
+.toggleOn::after {
+  left: 25px;
+}
+
+.limitControl {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Stepper */
+.stepper {
+  display: flex;
+  align-items: center;
+  border: 1px solid rgba(60, 45, 25, 0.25);
+  border-radius: 10px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.stepperBtn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: stepperBtnBg;
+  font-size: 18px;
+  cursor: pointer;
+  color: sumi;
+  font-family: fontSans;
+}
+
+.stepperBtn:hover {
+  background: stepperBtnHover;
+}
+
+.stepperNum {
+  width: 64px;
+  text-align: center;
+  font-weight: 600;
+  font-family: fontSans;
+  color: sumi;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Buttons */
+.saveBtn {
+  margin-top: 16px;
+  padding: 10px 24px;
+  background: vermillion;
+  color: #fff;
+  border: none;
+  border-radius: r;
+  font-family: fontSans;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.saveBtn:hover:not(:disabled) {
+  background: vermillionDeep;
+}
+
+.saveBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dangerRowBtn {
+  padding: 10px 16px;
+  background: transparent;
+  border: 1px solid rgba(189, 51, 38, 0.4);
+  border-radius: rInput;
+  font-family: fontSans;
+  font-size: 13px;
+  color: vermillion;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+
+.dangerRowBtn:hover {
+  background: rgba(189, 51, 38, 0.06);
+  border-color: vermillion;
+}
+
+/* Пароль */
+.passwordBlock {
+  margin-top: 30px;
+  max-width: 440px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.field label {
+  font-family: fontSans;
+  font-size: 13px;
+  color: sumiFaint;
+  font-weight: 600;
+}
+
+.field input[type="password"] {
+  padding: 8px 12px;
+  border: 1px solid rgba(60, 45, 25, 0.25);
+  border-radius: rInput;
+  font-family: fontSans;
+  font-size: 14px;
+  color: sumi;
+  background: #fff;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.field input[type="password"]:focus {
+  border-color: vermillion;
+}
+
+.hint {
   color: sumiFaint;
   font-family: fontSans;
-  font-size: 15px;
-  padding: 32px 0;
+  font-size: 12px;
+  margin: -8px 0 12px;
+}
+
+.errMsg {
+  color: vermillion;
+  font-family: fontSans;
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+
+/* Диалоги */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(36, 29, 22, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal {
+  background: paper;
+  border-radius: r;
+  padding: 28px 32px;
+  min-width: 320px;
+  max-width: 440px;
+  width: 100%;
+  box-shadow: 0 18px 40px -18px rgba(40, 28, 14, 0.55);
+}
+
+.modalTitle {
+  font-family: fontSans;
+  font-size: 17px;
+  font-weight: 700;
+  color: sumi;
+  margin: 0 0 16px;
+}
+
+.modalBody {
+  font-family: fontSans;
+  font-size: 14px;
+  color: sumiSoft;
+  margin: 0 0 20px;
+}
+
+.modalFooter {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.cancelBtn {
+  padding: 9px 20px;
+  background: transparent;
+  border: 1px solid rgba(60, 45, 25, 0.25);
+  border-radius: r;
+  font-family: fontSans;
+  font-size: 14px;
+  color: sumiSoft;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.cancelBtn:hover {
+  border-color: sumi;
+}
+
+.dangerBtn {
+  padding: 9px 22px;
+  background: vermillionDeep;
+  color: #fff;
+  border: none;
+  border-radius: r;
+  font-family: fontSans;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.dangerBtn:hover {
+  background: vermillion;
 }

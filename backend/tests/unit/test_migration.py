@@ -114,6 +114,67 @@ def test_backfill_frozen_engine_config(tmp_path, monkeypatch):
     assert white_ctl["nnue"] is True
 
 
+def test_backfill_user_settings_v2(tmp_path, monkeypatch):
+    """games_limit = MAX(current_limit, finished_limit) после миграции user_settings_v2."""
+    import subprocess
+
+    from sqlalchemy import create_engine, text
+
+    monkeypatch.setenv("RENJU_DATA_DIR", str(tmp_path))
+
+    # Поднять схему до состояния ДО нашей миграции
+    r = subprocess.run(
+        ["uv", "run", "alembic", "upgrade", "5d790f3dfeb5"],
+        capture_output=True,
+        text=True,
+    )
+    assert r.returncode == 0, r.stderr
+
+    # Вставить пользователя и строку user_settings со старыми полями
+    eng = create_engine(f"sqlite:///{tmp_path / 'db.sqlite'}")
+    with eng.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO users (id, username, password_hash, role, token_epoch) "
+                "VALUES (1, 'alice', 'x', 'user', 0)"
+            )
+        )
+        conn.execute(
+            text(
+                "INSERT INTO user_settings "
+                "(user_id, current_limit, current_limit_enabled, "
+                "finished_limit, finished_limit_enabled) "
+                "VALUES (1, 30, 1, 70, 1)"
+            )
+        )
+    eng.dispose()
+
+    # Накатить нашу миграцию
+    r2 = subprocess.run(
+        ["uv", "run", "alembic", "upgrade", "head"],
+        capture_output=True,
+        text=True,
+    )
+    assert r2.returncode == 0, r2.stderr
+
+    # Проверить backfill
+    eng2 = create_engine(f"sqlite:///{tmp_path / 'db.sqlite'}")
+    with eng2.connect() as conn:
+        row = conn.execute(
+            text(
+                "SELECT games_limit, games_limit_enabled, undo_enabled, undo_after_game_end "
+                "FROM user_settings WHERE user_id=1"
+            )
+        ).fetchone()
+    eng2.dispose()
+
+    assert row is not None
+    assert row[0] == 70  # MAX(30, 70)
+    assert row[1] == 1  # games_limit_enabled
+    assert row[2] == 1  # undo_enabled default
+    assert row[3] == 1  # undo_after_game_end default
+
+
 def test_backfill_unresolvable_level_uses_novice(tmp_path, monkeypatch):
     """engine с неизвестным/'-' уровнем → конфиг НОВИЧКА (через засеянный конфиг), а не
     пропуск: партия не остаётся без снимка, иначе строгий загрузчик уронил бы список."""

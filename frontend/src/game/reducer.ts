@@ -14,6 +14,7 @@ export function fromState(st: GameStateDTO): GameView {
     winningLine: st.winning_line?.map(([x, y]) => [x, y] as Point) ?? null,
     cursor: st.cursor,
     opponentLevelId: engine?.kind === "engine" ? engine.levelId : null,
+    undoCount: st.undo_count,
   };
 }
 
@@ -55,6 +56,7 @@ export function applyEvent(v: GameView, ev: GameEventMessage): GameView | "resyn
         pendingIndex: null,
         winningLine: null,
         forbidden: [],
+        undoCount: base.undoCount + 1,
       };
     case "reset":
       return "resync";
