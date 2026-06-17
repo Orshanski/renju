@@ -2,6 +2,8 @@ async def test_security_headers(client):
     r = await client.get("/api/health")
     assert r.headers["X-Frame-Options"] == "DENY"
     assert "default-src 'self'" in r.headers["Content-Security-Policy"]
+    # CF Web Analytics (beacon.min.js) разрешён в script-src — иначе CSP режет beacon
+    assert "https://static.cloudflareinsights.com" in r.headers["Content-Security-Policy"]
     assert r.headers["X-Content-Type-Options"] == "nosniff"
 
 
