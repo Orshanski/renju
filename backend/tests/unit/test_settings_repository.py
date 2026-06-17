@@ -55,6 +55,7 @@ async def test_sql_get_or_default_no_row(session):
     assert s.games_limit_enabled is True
     assert s.undo_enabled is True
     assert s.undo_limit is None
+    assert s.undo_after_game_end is True
 
 
 async def test_sql_upsert_and_get(session, engine):
