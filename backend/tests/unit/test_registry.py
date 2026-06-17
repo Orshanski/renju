@@ -236,7 +236,8 @@ async def test_sweep_reaps_idle_no_presence():
     clock = {"t": 0.0}
 
     async def spawn(**kw):
-        return FakeProc(["7,8"])  # ответ на первый ход; после — зависнет (но sweep не зависит от хода)
+        # ответ на первый ход; sweep от хода не зависит
+        return FakeProc(["7,8"])
 
     reg = make_registry(spawn, idle_timeout_s=10.0, now=lambda: clock["t"])
     # compute_move создаёт слот без presence; после хода inflight→0, presence=0

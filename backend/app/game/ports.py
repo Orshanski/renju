@@ -32,9 +32,7 @@ class EngineAdapter(Protocol):
         nnue: bool | None = None,
     ) -> list[Point]: ...
 
-    async def sync_after_undo(
-        self, game_id: str, moves: Sequence[Point], *, level_tag: str = "-"
-    ) -> None: ...
+    async def sync_after_undo(self, game_id: str, moves: Sequence[Point]) -> None: ...
 
 
 class EventHub(Protocol):

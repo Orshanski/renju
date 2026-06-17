@@ -33,8 +33,8 @@ class FakeAdapter:
     ):
         return self.move
 
-    async def sync_after_undo(self, game_id, moves, *, level_tag="-"):
-        self.undo_syncs.append((game_id, [tuple(m) for m in moves], level_tag))
+    async def sync_after_undo(self, game_id, moves):
+        self.undo_syncs.append((game_id, [tuple(m) for m in moves]))
 
 
 def _svc(adapter=None, settings_repo=None):
@@ -149,7 +149,7 @@ async def test_advance_engine_error_publishes_error_event():
     async def boom(game_id, moves, params, allowed_zone=None, *, level_tag="-", nnue=None):
         raise EngineError("twice")
 
-    setattr(svc._adapter, 'compute_move', boom)
+    svc._adapter.compute_move = boom
     g = await _create_game(svc, owner_id=1, human_color="black")
     assert g.status == "opponent_thinking"
     await svc.advance(g)  # движок падает → error-событие, статус НЕ меняется (§4.8 доиграет позже)
@@ -225,7 +225,7 @@ async def test_undo_pure_replay_no_engine():
     # откат белых: снимаем ход 3 (движок) и ход 2 (человек) → назад к [[7,7]]
     assert g.moves == [[7, 7]] and "2" not in g.forbidden_log and "3" not in g.forbidden_log
     assert fake.calls == 0  # undo без движка
-    assert fake.undo_syncs == [(g.id, [(7, 7)], "-")]
+    assert fake.undo_syncs == [(g.id, [(7, 7)])]
 
 
 async def test_advance_recovers_and_is_idempotent():
@@ -256,7 +256,7 @@ async def test_advance_recovery_when_engine_move_already_applied():
         fake.calls += 1
         return await orig(*a, **k)
 
-    setattr(svc._adapter, 'compute_move', counting)
+    svc._adapter.compute_move = counting
     await svc.advance(g)  # позиция = ход человека → advance оседает на awaiting_move без движка
     assert g.moves == [[7, 7], [8, 8]] and g.status == "awaiting_move"
     assert fake.calls == 0  # движок НЕ дёрнут — ход не задвоен

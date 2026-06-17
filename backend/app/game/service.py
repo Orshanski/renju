@@ -254,7 +254,7 @@ class GameService:
         )
         new_moves = undo_truncate(moves=[tuple(m) for m in game.moves], for_color=Color(my_side))
         k = len(new_moves)
-        await self._adapter.sync_after_undo(game.id, new_moves, level_tag="-")
+        await self._adapter.sync_after_undo(game.id, new_moves)
         game.moves = [list(p) for p in new_moves]
         game.forbidden_log = {key: v for key, v in game.forbidden_log.items() if int(key) <= k}
         game.undo_count += 1

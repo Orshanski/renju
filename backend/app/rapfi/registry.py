@@ -161,9 +161,7 @@ class EngineRegistry:
         )
         return list(parsed.forbidden)
 
-    async def sync_after_undo(
-        self, game_id: str, moves: Sequence[Point], *, level_tag: str = "-"
-    ) -> None:
+    async def sync_after_undo(self, game_id: str, moves: Sequence[Point]) -> None:
         """Undo-синхронизация живого процесса: только штатные TAKEBACK, без cold replay.
 
         Если процесса/слота нет — синхронизировать нечего. Если живой slot уже не
@@ -292,7 +290,7 @@ class EngineRegistry:
                 and s.inflight == 0
                 and self._now() - s.last_activity > self._idle
             ]
-            for gid, _s in victims:
+            for gid, _ in victims:
                 self._slots.pop(gid, None)
             if victims:
                 self._cond.notify_all()
