@@ -1,5 +1,5 @@
 import { it, expect } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { server, http, HttpResponse } from "../test/msw";
@@ -97,4 +97,19 @@ it("активная вкладка «Админ» при роуте /admin (adm
   await waitFor(() => expect(screen.getByText("bob")).toBeInTheDocument());
   expect(screen.getByRole("button", { name: "Админ" })).toHaveAttribute("aria-current", "page");
   expect(screen.getByRole("button", { name: "Партии" })).not.toHaveAttribute("aria-current", "page");
+});
+
+it("онлайн — баннера «Нет связи» нет", async () => {
+  server.use(http.get("/api/auth/me", () => HttpResponse.json({ id: 1, username: "alice", role: "user" })));
+  tree();
+  await waitFor(() => expect(screen.getByText("alice")).toBeInTheDocument());
+  expect(screen.queryByText(/нет связи/i)).not.toBeInTheDocument();
+});
+
+it("офлайн — баннер «Нет связи» виден", async () => {
+  server.use(http.get("/api/auth/me", () => HttpResponse.json({ id: 1, username: "alice", role: "user" })));
+  tree();
+  await waitFor(() => expect(screen.getByText("alice")).toBeInTheDocument());
+  act(() => { window.dispatchEvent(new Event("offline")); });
+  expect(screen.getByText(/нет связи/i)).toBeInTheDocument();
 });

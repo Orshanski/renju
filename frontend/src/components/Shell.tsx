@@ -1,5 +1,6 @@
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import styles from "./Shell.module.css";
 
 // Каркас — по prototype/index.html §App chrome (бренд + навбар + юзерчип).
@@ -7,6 +8,7 @@ export function Shell() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const online = useOnlineStatus();
 
   async function onLogout() {
     await logout();
@@ -74,6 +76,11 @@ export function Shell() {
           <button className={styles.linkbtn} onClick={onLogout}>выйти</button>
         </div>
       </header>
+      {!online && (
+        <div className={styles.offlineBar} role="status">
+          Нет связи — проверьте соединение
+        </div>
+      )}
       <main className={styles.main}><Outlet /></main>
     </div>
   );
