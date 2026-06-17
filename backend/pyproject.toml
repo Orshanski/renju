@@ -2,7 +2,7 @@
 name = "renju-backend"
 version = "0.1.0"
 description = "Renju web app backend"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 dependencies = [
     "aiosqlite>=0.22.1",
     "alembic>=1.18.4",
