@@ -48,5 +48,6 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             cd backend && uv sync --no-dev
+            uv run alembic upgrade head
             cd ../frontend && npm ci && npx vite build
             sudo systemctl restart renju
