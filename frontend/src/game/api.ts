@@ -46,3 +46,7 @@ export function unfavoriteGame(id: string): Promise<true> {
 export function deleteGame(id: string): Promise<void> {
   return apiRequest<void>("DELETE", `/api/games/${id}`);
 }
+
+export function bulkDeleteGames(section: "current" | "finished"): Promise<void> {
+  return apiRequest<void>("DELETE", `/api/games?section=${section}`);
+}
