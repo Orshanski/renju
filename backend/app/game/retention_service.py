@@ -28,8 +28,7 @@ class RetentionService:
             )
             created_at: datetime = g.created_at if g.created_at is not None else _now()
             candidates.append(Evictable(id=g.id, sort_key=sort_key, created_at=created_at))
-        for game_id in select_evictions(candidates, settings.games_limit):
-            await self._repo.delete(game_id)
+        await self._repo.delete_many(select_evictions(candidates, settings.games_limit))
 
     async def evict_finished(self, owner_id: int) -> None:
         """Подрезает раздел FINISHED для владельца до games_limit."""
@@ -44,8 +43,7 @@ class RetentionService:
             sort_key = g.finished_at if g.finished_at is not None else (g.created_at or _now())
             created_at: datetime = g.created_at if g.created_at is not None else _now()
             candidates.append(Evictable(id=g.id, sort_key=sort_key, created_at=created_at))
-        for game_id in select_evictions(candidates, settings.games_limit):
-            await self._repo.delete(game_id)
+        await self._repo.delete_many(select_evictions(candidates, settings.games_limit))
 
     async def enforce_limits(self, owner_id: int) -> None:
         """Подрезает оба раздела (CURRENT + FINISHED) до лимита."""
