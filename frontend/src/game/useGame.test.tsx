@@ -206,6 +206,18 @@ it("размонтирование закрывает стрим", async () => {
   expect(FakeEventSource.last().readyState).toBe(2);
 });
 
+it("событие online переподключает SSE после обрыва", async () => {
+  server.use(http.get("/api/games/g1", () => HttpResponse.json(state())));
+  // большой reconnectDelayMs: таймерный reconnect из onerror не успеет создать 2-й инстанс —
+  // проверяем именно online-путь, а не таймер (иначе тест ложно-зелёный)
+  const { unmount } = renderHook(() => useGame("g1", 100000));
+  await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+  act(() => FakeEventSource.last().fail());      // обрыв → onerror → es.close(), readyState=2
+  act(() => { window.dispatchEvent(new Event("online")); });
+  await waitFor(() => expect(FakeEventSource.instances).toHaveLength(2)); // online создал новый стрим
+  unmount();
+});
+
 it("presence: enter на mount, leave на unmount (rj-899)", async () => {
   const calls: string[] = [];
   server.use(

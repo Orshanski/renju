@@ -85,10 +85,21 @@ export function useGame(gameId: string, reconnectDelayMs = 3000) {
         if (aliveRef.current) setNotice("Не удалось загрузить партию");
       }
     })();
+    const onOnline = () => {
+      // поток закрыт/отсутствует → переподключиться. readyState сравниваем с литералом 2
+      // (CLOSED) — как везде в useGame; FakeEventSource в тестах не имеет статической
+      // константы EventSource.CLOSED, и `=== EventSource.CLOSED` дало бы undefined.
+      if (aliveRef.current && (esRef.current === null || esRef.current.readyState === 2)) {
+        if (timerRef.current) clearTimeout(timerRef.current); // гасим висящий reconnect-таймер из onerror (без двойного connect)
+        connect(viewRef.current?.cursor ?? 0);
+      }
+    };
+    globalThis.addEventListener("online", onOnline);
     return () => {
       aliveRef.current = false;
       esRef.current?.close();
       if (timerRef.current) clearTimeout(timerRef.current);
+      globalThis.removeEventListener("online", onOnline);
       void leaveGame(gameId).catch(() => {}); // presence--: гасим, если ушло последнее устройство
     };
   }, [gameId, connect, commit]);
