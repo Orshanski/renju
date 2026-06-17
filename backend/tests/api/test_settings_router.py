@@ -23,7 +23,7 @@ async def test_get_settings_returns_defaults(app, client):
     assert body["undo_after_game_end"] is True
 
 
-async def test_get_settings_requires_auth(app, client):
+async def test_get_settings_requires_auth(client):
     r = await client.get("/api/settings")
     assert r.status_code == 401
 
