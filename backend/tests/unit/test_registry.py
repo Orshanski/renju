@@ -195,24 +195,58 @@ async def test_release_kills_idle():  # API под удаление партии
     await reg.close()
 
 
-# --- Task 5: idle-sweep (без гейта presence) ---
+# --- Task 5: idle-sweep (гейт presence) ---
 
 
 @pytest.mark.asyncio
-async def test_sweep_reaps_idle_regardless_of_presence():
+async def test_sweep_skips_active_presence():
+    """Sweep не убивает слот, пока presence > 0 (пользователь в партии думает над ходом)."""
     clock = {"t": 0.0}
 
     async def spawn(**kw):
         return FakeProc([])
 
     reg = make_registry(spawn, idle_timeout_s=10.0, now=lambda: clock["t"])
-    await reg.mark_present("g")  # presence=1 (зависший «дрейф»)
+    await reg.mark_present("g")  # presence=1
+    clock["t"] = 20.0  # давно за пределами idle_timeout
+    await reg.sweep_once()
+    assert "g" in reg._slots  # presence > 0 → НЕ реапим
+    await reg.close()
+
+
+@pytest.mark.asyncio
+async def test_sweep_reaps_idle_after_leave():
+    """Sweep убивает слот, когда presence == 0 и timeout истёк."""
+    clock = {"t": 0.0}
+
+    async def spawn(**kw):
+        return FakeProc([])
+
+    reg = make_registry(spawn, idle_timeout_s=10.0, now=lambda: clock["t"])
+    await reg.mark_present("g")
+    await reg.mark_absent("g")  # presence → 0; но слот уже удалён mark_absent
+    # mark_absent с presence→0 и inflight==0 сам удаляет слот → sweep не увидит его
+    assert "g" not in reg._slots
+    await reg.close()
+
+
+@pytest.mark.asyncio
+async def test_sweep_reaps_idle_no_presence():
+    """Слот без presence реапится по idle — sweep работает там, где presence == 0."""
+    clock = {"t": 0.0}
+
+    async def spawn(**kw):
+        return FakeProc(["7,8"])  # ответ на первый ход; после — зависнет (но sweep не зависит от хода)
+
+    reg = make_registry(spawn, idle_timeout_s=10.0, now=lambda: clock["t"])
+    # compute_move создаёт слот без presence; после хода inflight→0, presence=0
+    await reg.compute_move("g", [(7, 7)], EngineParams(strength=1, timeout_turn_ms=5000))
     clock["t"] = 5.0
     await reg.sweep_once()
-    assert "g" in reg._slots  # ещё активен
+    assert "g" in reg._slots  # ещё в пределах timeout
     clock["t"] = 20.0
     await reg.sweep_once()
-    assert "g" not in reg._slots  # по простою реапнут, ХОТЯ presence>0
+    assert "g" not in reg._slots  # presence==0, idle → реапим
     await reg.close()
 
 

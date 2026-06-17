@@ -283,12 +283,12 @@ class EngineRegistry:
             await self._terminate(victim, game_id, reason)
 
     async def sweep_once(self) -> None:
-        """idle-таймаут: реап по неактивности (inflight==0 && idle), БЕЗ гейта presence."""
+        """idle-таймаут: реап по неактивности (presence==0 && inflight==0 && idle)."""
         async with self._cond:
             victims = [
                 (gid, s)
                 for gid, s in self._slots.items()
-                if s.inflight == 0 and self._now() - s.last_activity > self._idle
+                if s.presence == 0 and s.inflight == 0 and self._now() - s.last_activity > self._idle
             ]
             for gid, _s in victims:
                 self._slots.pop(gid, None)
