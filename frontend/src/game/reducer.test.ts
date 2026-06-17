@@ -18,9 +18,15 @@ describe("fromState", () => {
     expect(v).toMatchObject({
       id: "g1", yourColor: "black", status: "awaiting_move", cursor: 5,
       pendingIndex: null, winningLine: null, opponentLevelId: "novice",
+      undoCount: 0,
     });
     expect(v.moves).toEqual([[7, 7], [6, 6]]);
     expect(v.forbidden).toEqual([[5, 5]]);
+  });
+
+  it("undo_count из DTO переносится в undoCount", () => {
+    const dtoWithUndo: GameStateDTO = { ...dto, undo_count: 3 };
+    expect(fromState(dtoWithUndo).undoCount).toBe(3);
   });
 });
 
@@ -86,6 +92,11 @@ describe("status / forbidden / undo / reset / error", () => {
     const r = applyEvent(finished, ev({ seq: 6, type: "undo", payload: { move_count: 1 } })) as GameView;
     expect(r.moves).toEqual([[7, 7]]);
     expect(r).toMatchObject({ status: "awaiting_move", pendingIndex: null, winningLine: null, forbidden: [] });
+  });
+  it("undo-событие инкрементит undoCount", () => {
+    const withCount: GameView = { ...view(), undoCount: 2 };
+    const r = applyEvent(withCount, ev({ seq: 6, type: "undo", payload: { move_count: 1 } })) as GameView;
+    expect(r.undoCount).toBe(3);
   });
   it("reset → resync", () => {
     expect(applyEvent(view(), ev({ seq: 6, type: "reset", payload: {} }))).toBe("resync");

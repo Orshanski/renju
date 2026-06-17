@@ -1,9 +1,12 @@
 import { useNavigate, useParams } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { Board } from "../components/board/Board";
 import { canPlay, canUndo, colorToMove, openingZone, pointLabel } from "../game/legality";
+import type { UndoCfg } from "../game/legality";
 import type { GameView } from "../game/view";
 import { useGame } from "../game/useGame";
 import { useLevels } from "../game/useLevels";
+import { getSettings } from "../settings.api";
 import styles from "./GamePage.module.css";
 
 const COLOR_RU = { black: "чёрными", white: "белыми" } as const;
@@ -28,6 +31,15 @@ export default function GamePage() {
   const navigate = useNavigate();
   const { view, notice, play, undoMove, dismissNotice } = useGame(gameId!);
   const { nameOf } = useLevels();
+  const [undoPolicy, setUndoPolicy] = useState<UndoCfg | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    getSettings().then((s) => {
+      if (active) setUndoPolicy({ undo_enabled: s.undo_enabled, undo_limit: s.undo_limit, undo_after_game_end: s.undo_after_game_end });
+    }).catch(() => { /* при ошибке остаёмся в null → кнопка disabled */ });
+    return () => { active = false; };
+  }, []);
 
   if (!view) return <div className={styles.loading}>{notice ?? "Загрузка…"}</div>;
 
@@ -106,7 +118,7 @@ export default function GamePage() {
             </div>
           </div>
           <div className={styles.controls}>
-            <button type="button" className={styles.undoBtn} disabled={!canUndo(view)} onClick={() => void undoMove()}>
+            <button type="button" className={styles.undoBtn} disabled={undoPolicy === null || !canUndo(view, undoPolicy)} onClick={() => void undoMove()}>
               ↶ Отменить
             </button>
           </div>

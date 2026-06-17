@@ -10,6 +10,9 @@ import type { GameStateDTO } from "../game/types";
 const levels = http.get("/api/levels", () =>
   HttpResponse.json([{ id: "novice", name: "Новичок" }, { id: "master", name: "Мастер" }]),
 );
+const settings = http.get("/api/settings", () =>
+  HttpResponse.json({ games_limit: 10, games_limit_enabled: false, undo_enabled: true, undo_limit: null, undo_after_game_end: true }),
+);
 const state = (over: Partial<GameStateDTO> = {}): GameStateDTO => ({
   id: "g1", owner_id: 1,
   controllers: { black: { kind: "user" }, white: { kind: "engine", levelId: "novice" } },
@@ -31,6 +34,7 @@ function renderPage() {
 beforeEach(() => {
   installFakeEventSource();
   FakeEventSource.reset();
+  server.use(settings); // дефолтная политика undo: enabled, без лимита
 });
 
 it("панель: заголовок, чей ход, уровень по имени, цвет, № хода, лог", async () => {
@@ -103,6 +107,8 @@ it("финиш: текст победы, линия подсвечена; undo �
   expect(await screen.findByText("Победа чёрных ⚫")).toBeInTheDocument();
   expect(screen.getByTestId("win-9-7")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "A1" })).toBeDisabled(); // ввод заблокирован
+  // ждём резолва настроек (кнопка disabled пока политика не загружена)
+  await waitFor(() => expect(screen.getByRole("button", { name: /отменить/i })).not.toBeDisabled());
   await userEvent.click(screen.getByRole("button", { name: /отменить/i }));
   await waitFor(() => expect(screen.queryByTestId("win-9-7")).not.toBeInTheDocument());
   expect(screen.getByText("Твой ход")).toBeInTheDocument();
