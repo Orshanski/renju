@@ -120,6 +120,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if assets.is_dir():  # StaticFiles падает без каталога; гард — частичный dist не ронял старт
             app.mount("/assets", StaticFiles(directory=assets), name="assets")
 
+        _MEDIA = {".webmanifest": "application/manifest+json", ".js": "text/javascript"}
+
         @app.get("/{full_path:path}")
         async def spa(full_path: str):
             if full_path.startswith("api/"):
@@ -128,7 +130,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             # is_relative_to: ../-обход не должен выйти за dist (path-traversal). /assets-mount
             # StaticFiles защищает сам; этот корневой file-branch (favicon и пр.) — нет, гард тут.
             if full_path and candidate.is_file() and candidate.is_relative_to(dist_root):
-                return FileResponse(candidate)
+                return FileResponse(candidate, media_type=_MEDIA.get(candidate.suffix))
             return FileResponse(dist / "index.html")
 
     return app

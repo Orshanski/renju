@@ -9,6 +9,8 @@ async def app_with_spa(tmp_path, monkeypatch):
     (dist / "index.html").write_text("<!doctype html><div id=root></div>", encoding="utf-8")
     (dist / "assets").mkdir()
     (dist / "assets" / "app.js").write_text("console.log(1)", encoding="utf-8")
+    (dist / "sw.js").write_text("/* sw */", encoding="utf-8")
+    (dist / "manifest.webmanifest").write_text('{"name":"Renju"}', encoding="utf-8")
     monkeypatch.setenv("RENJU_FRONTEND_DIST", str(dist))
     import app.models.game  # noqa: F401
     import app.models.user  # noqa: F401 — обе модели в metadata до create_all (как conftest.app)
@@ -63,3 +65,16 @@ async def test_existing_api_get_wins_over_catchall(spa_client):
     r = await spa_client.get("/api/auth/me")
     assert r.status_code == 401
     assert "id=root" not in r.text
+
+
+async def test_sw_js_mime(spa_client):
+    r = await spa_client.get("/sw.js")
+    assert r.status_code == 200
+    assert "javascript" in r.headers["content-type"]
+    assert "/* sw */" in r.text
+
+
+async def test_manifest_mime(spa_client):
+    r = await spa_client.get("/manifest.webmanifest")
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "application/manifest+json"
