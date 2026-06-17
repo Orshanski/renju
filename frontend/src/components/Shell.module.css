@@ -74,3 +74,11 @@
 .tab:hover { background: rgba(60, 45, 25, .07); color: sumi; }
 .active { background: sumi; color: paper; }
 @media bpCompact { .bar { padding: 12px 16px; } .main { padding: 20px 16px 40px; } }
+.offlineBar {
+  background: vermillion;
+  color: #fff;
+  font-family: fontSans;
+  font-size: 13px;
+  text-align: center;
+  padding: 6px 12px;
+}
