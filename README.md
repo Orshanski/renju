@@ -1,6 +1,6 @@
 # Renju
 
-Self-hosted web app for playing [renju](https://en.wikipedia.org/wiki/Renju) (professional 5-in-a-row) against an AI engine. Runs on your own server, playable in the browser and installable as a PWA on iPad or iPhone.
+Self-hosted web app for playing [renju](https://en.wikipedia.org/wiki/Renju) (professional 5-in-a-row) against an AI engine. Runs on your own server, playable in the browser and installable as a PWA on iPad or iPhone. Powered by [Rapfi](https://github.com/dhbloo/rapfi).
 
 ## Why
 
