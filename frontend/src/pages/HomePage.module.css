@@ -14,7 +14,7 @@
 
 .eyebrow { composes: eyebrow from "../styles/layout.module.css"; }
 
-.title { composes: title from "../styles/layout.module.css"; margin: 14px 0 6px; }
+.title { composes: title from "../styles/layout.module.css"; margin-bottom: 6px; }
 .sub { composes: sub from "../styles/layout.module.css"; }
 
 .newBtn {

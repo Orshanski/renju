@@ -3,7 +3,7 @@
 
 .wrap { composes: wrap from "../styles/layout.module.css"; }
 .eyebrow { composes: eyebrow from "../styles/layout.module.css"; }
-.title { composes: title from "../styles/layout.module.css"; margin: 14px 0 22px; }
+.title { composes: title from "../styles/layout.module.css"; margin-bottom: 22px; }
 .sub { composes: sub from "../styles/layout.module.css"; }
 
 /* плитки уровней — иероглиф-печать + название; два центрированных ряда (3 + 4 для 7 уровней) */

@@ -12,7 +12,7 @@
 
 .title {
   composes: title from "../styles/layout.module.css";
-  margin: 0 0 28px;
+  margin-bottom: 28px;
 }
 
 .sectionTitle {

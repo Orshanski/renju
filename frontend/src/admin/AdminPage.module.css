@@ -5,7 +5,7 @@
 
 .eyebrow { composes: eyebrow from "../styles/layout.module.css"; }
 
-.title { composes: title from "../styles/layout.module.css"; margin: 0 0 28px; }
+.title { composes: title from "../styles/layout.module.css"; margin-bottom: 28px; }
 
 .tabs {
   display: flex;

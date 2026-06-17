@@ -40,6 +40,7 @@
   font-size: 40px;
   line-height: 1.05;
   letter-spacing: -0.5px;
+  margin-top: 14px; /* единый зазор бровка→заголовок на всех экранах */
 }
 
 .sub { color: sumiSoft; font-size: 15px; font-weight: 300; }
