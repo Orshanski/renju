@@ -288,7 +288,9 @@ class EngineRegistry:
             victims = [
                 (gid, s)
                 for gid, s in self._slots.items()
-                if s.presence == 0 and s.inflight == 0 and self._now() - s.last_activity > self._idle
+                if s.presence == 0
+                and s.inflight == 0
+                and self._now() - s.last_activity > self._idle
             ]
             for gid, _s in victims:
                 self._slots.pop(gid, None)
