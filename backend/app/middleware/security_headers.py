@@ -1,6 +1,8 @@
 _HEADERS = {
     "Content-Security-Policy": (
-        "default-src 'self'; script-src 'self'; object-src 'none'; "
+        # CF Web Analytics инжектит beacon.min.js со static.cloudflareinsights.com
+        "default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; "
+        "object-src 'none'; "
         "base-uri 'none'; frame-ancestors 'none'; connect-src 'self'; "
         # шрифты прототипа — с Google Fonts (решение Alexey 2026-06-12); только эти два хоста
         "style-src 'self' https://fonts.googleapis.com; "
