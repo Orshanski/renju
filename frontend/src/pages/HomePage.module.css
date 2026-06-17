@@ -1,7 +1,7 @@
 /* по prototype/index.html §GAMES LIST (.list-head); токены — @value (tokens.module.css) */
-@value sumi, sumiSoft, vermillion, vermillionDeep, shadowSm, fontSerif, fontSans from "../styles/tokens.module.css";
+@value sumi, sumiSoft, vermillion, vermillionDeep, shadowSm, fontSans from "../styles/tokens.module.css";
 
-.wrap { max-width: 1120px; margin: 0 auto; }
+.wrap { composes: wrap from "../styles/layout.module.css"; }
 
 /* шапка: слева eyebrow + заголовок + подзаголовок, справа кнопка «＋ Новая партия» (низами в линию) */
 .head {
@@ -12,39 +12,16 @@
   margin-bottom: 30px;
 }
 
-.eyebrow {
-  font-family: fontSerif;
-  font-weight: 600;
-  letter-spacing: 5px;
-  text-transform: uppercase;
-  font-size: 11px;
-  color: vermillion;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.eyebrow::before { content: ""; width: 26px; height: 1px; background: vermillion; display: inline-block; }
+.eyebrow { composes: eyebrow from "../styles/layout.module.css"; }
 
-.title { font-family: fontSerif; font-weight: 800; font-size: 40px; line-height: 1.05; margin: 14px 0 6px; letter-spacing: -0.5px; }
-.sub { color: sumiSoft; font-size: 15px; font-weight: 300; }
+.title { composes: title from "../styles/layout.module.css"; margin-bottom: 6px; }
+.sub { composes: sub from "../styles/layout.module.css"; }
 
 .newBtn {
-  font-family: fontSans;
-  font-weight: 500;
-  font-size: 15px;
-  letter-spacing: 0.5px;
-  cursor: pointer;
-  border: none;
-  border-radius: 11px;
-  padding: 14px 22px;
-  background: vermillion;
-  color: #fbeee6;
-  box-shadow: shadowSm;
-  transition: 0.18s;
+  composes: btn from "../styles/layout.module.css";
   white-space: nowrap;
   flex-shrink: 0;
 }
-.newBtn:hover { background: vermillionDeep; transform: translateY(-1px); }
 
 /* таб-бар разделов — по prototype/index.html §ADMIN (.admin-tabs): подчёркивание */
 .tabs {

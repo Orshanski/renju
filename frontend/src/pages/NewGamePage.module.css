@@ -1,11 +1,10 @@
 /* Экран новой партии — по prototype/index.html §MODAL (.levels/.lvl/.dice); токены — @value. */
-@value sumi, sumiSoft, vermillion, vermillionDeep, indigo, shadowSm, fontSerif, fontSans from "../styles/tokens.module.css";
+@value sumi, vermillionDeep, indigo, shadowSm, fontSerif, fontSans from "../styles/tokens.module.css";
 
-.wrap { max-width: 1120px; margin: 0 auto; }
-.eyebrow { font-family: fontSerif; font-weight: 600; letter-spacing: 5px; text-transform: uppercase; font-size: 11px; color: vermillion; display: flex; align-items: center; gap: 10px; }
-.eyebrow::before { content: ""; width: 26px; height: 1px; background: vermillion; display: inline-block; }
-.title { font-family: fontSerif; font-weight: 800; font-size: 40px; line-height: 1.05; margin: 14px 0 22px; letter-spacing: -0.5px; }
-.sub { color: sumiSoft; font-size: 15px; font-weight: 300; }
+.wrap { composes: wrap from "../styles/layout.module.css"; }
+.eyebrow { composes: eyebrow from "../styles/layout.module.css"; }
+.title { composes: title from "../styles/layout.module.css"; margin-bottom: 22px; }
+.sub { composes: sub from "../styles/layout.module.css"; }
 
 /* плитки уровней — иероглиф-печать + название; два центрированных ряда (3 + 4 для 7 уровней) */
 .levels { display: flex; flex-direction: column; gap: 12px; max-width: 632px; }

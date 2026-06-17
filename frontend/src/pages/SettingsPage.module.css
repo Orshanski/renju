@@ -2,35 +2,26 @@
 @value sumi, sumiSoft, sumiFaint, vermillion, vermillionDeep, paper, okGreen, r, rInput, fontSerif, fontSans, toggleKnob, stepperBtnBg, stepperBtnHover from "../styles/tokens.module.css";
 
 .wrap {
-  max-width: 680px;
-  margin: 0 auto;
+  composes: wrap from "../styles/layout.module.css";
   padding: 0 0 48px;
 }
 
 .eyebrow {
-  font-family: fontSans;
-  font-size: 11px;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: sumiFaint;
-  margin-bottom: 6px;
+  composes: eyebrow from "../styles/layout.module.css";
 }
 
 .title {
-  font-family: fontSerif;
-  font-size: 28px;
-  font-weight: 700;
-  color: sumi;
-  margin: 0 0 28px;
+  composes: title from "../styles/layout.module.css";
+  margin-bottom: 28px;
 }
 
 .sectionTitle {
-  font-family: fontSans;
-  font-size: 11px;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: sumiFaint;
+  composes: eyebrow from "../styles/layout.module.css";
   margin: 30px 0 14px;
+}
+
+.passwordBlock .sectionTitle {
+  margin-top: 0;
 }
 
 .settings {
@@ -138,26 +129,8 @@
 
 /* Buttons */
 .saveBtn {
+  composes: btn from "../styles/layout.module.css";
   margin-top: 16px;
-  padding: 10px 24px;
-  background: vermillion;
-  color: #fff;
-  border: none;
-  border-radius: r;
-  font-family: fontSans;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.saveBtn:hover:not(:disabled) {
-  background: vermillionDeep;
-}
-
-.saveBtn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .dangerRowBtn {
