@@ -185,7 +185,7 @@ function CreateModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
           <label htmlFor="create-password">Пароль</label>
           <input
             id="create-password"
-            type="text"
+            type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
@@ -260,7 +260,7 @@ function ResetPasswordModal({
           <label htmlFor="reset-password">Новый пароль</label>
           <input
             id="reset-password"
-            type="text"
+            type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoFocus
