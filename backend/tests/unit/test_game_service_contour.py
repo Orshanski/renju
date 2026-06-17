@@ -393,10 +393,16 @@ async def test_finish_sets_finished_at_and_evicts_over_limit():
     from app.models.user_settings import UserSettings
 
     sr = InMemorySettingsRepository()
-    await sr.upsert(UserSettings(
-        user_id=1, games_limit=2, games_limit_enabled=True,
-        undo_enabled=True, undo_limit=None, undo_after_game_end=True,
-    ))
+    await sr.upsert(
+        UserSettings(
+            user_id=1,
+            games_limit=2,
+            games_limit_enabled=True,
+            undo_enabled=True,
+            undo_limit=None,
+            undo_after_game_end=True,
+        )
+    )
     svc = _svc(settings_repo=sr)
 
     now = datetime(2026, 1, 1, 12, 0, 0)
@@ -481,10 +487,16 @@ async def test_create_evicts_current_over_limit():
     from app.models.user_settings import UserSettings
 
     sr = InMemorySettingsRepository()
-    await sr.upsert(UserSettings(
-        user_id=1, games_limit=2, games_limit_enabled=True,
-        undo_enabled=True, undo_limit=None, undo_after_game_end=True,
-    ))
+    await sr.upsert(
+        UserSettings(
+            user_id=1,
+            games_limit=2,
+            games_limit_enabled=True,
+            undo_enabled=True,
+            undo_limit=None,
+            undo_after_game_end=True,
+        )
+    )
     svc = _svc(settings_repo=sr)
 
     now = datetime(2026, 1, 1, 12, 0, 0)
@@ -545,10 +557,16 @@ async def test_favorite_only_finished_and_exempt_from_limit():
     from app.models.user_settings import UserSettings
 
     sr = InMemorySettingsRepository()
-    await sr.upsert(UserSettings(
-        user_id=1, games_limit=1, games_limit_enabled=True,
-        undo_enabled=True, undo_limit=None, undo_after_game_end=True,
-    ))
+    await sr.upsert(
+        UserSettings(
+            user_id=1,
+            games_limit=1,
+            games_limit_enabled=True,
+            undo_enabled=True,
+            undo_limit=None,
+            undo_after_game_end=True,
+        )
+    )
     svc = _svc(settings_repo=sr)
     now = datetime(2026, 1, 1, 12, 0, 0)
     ctl = {
@@ -640,10 +658,16 @@ async def test_unfavorite_returns_to_finished_and_rechecks_limit():
     from app.models.user_settings import UserSettings
 
     sr = InMemorySettingsRepository()
-    await sr.upsert(UserSettings(
-        user_id=1, games_limit=1, games_limit_enabled=True,
-        undo_enabled=True, undo_limit=None, undo_after_game_end=True,
-    ))
+    await sr.upsert(
+        UserSettings(
+            user_id=1,
+            games_limit=1,
+            games_limit_enabled=True,
+            undo_enabled=True,
+            undo_limit=None,
+            undo_after_game_end=True,
+        )
+    )
     svc = _svc(settings_repo=sr)
     now = datetime(2026, 1, 1, 12, 0, 0)
     ctl = {
@@ -721,10 +745,16 @@ async def test_enforce_limits_trims_both_sections():
     from app.models.user_settings import UserSettings
 
     sr = InMemorySettingsRepository()
-    await sr.upsert(UserSettings(
-        user_id=1, games_limit=1, games_limit_enabled=True,
-        undo_enabled=True, undo_limit=None, undo_after_game_end=True,
-    ))
+    await sr.upsert(
+        UserSettings(
+            user_id=1,
+            games_limit=1,
+            games_limit_enabled=True,
+            undo_enabled=True,
+            undo_limit=None,
+            undo_after_game_end=True,
+        )
+    )
     svc = _svc(settings_repo=sr)
     now = datetime(2026, 1, 1, 12, 0, 0)
     ctl = {
@@ -778,6 +808,72 @@ async def test_enforce_limits_trims_both_sections():
     # Выжившие — новейшие
     assert current_remaining[0].id == "cur1"  # delta=3, newer
     assert finished_remaining[0].id == "fin1"  # delta=2, newer
+
+
+async def test_undo_respects_policy_disabled():
+    """Если undo_enabled=False, undo должен отклоняться."""
+    import pytest
+
+    from app.domain.errors import UndoRejected
+    from app.models.user_settings import UserSettings
+
+    sr = InMemorySettingsRepository()
+    await sr.upsert(
+        UserSettings(
+            user_id=1,
+            games_limit=50,
+            games_limit_enabled=True,
+            undo_enabled=False,
+            undo_limit=None,
+            undo_after_game_end=True,
+        )
+    )
+    svc = _svc(settings_repo=sr)
+    fake = _fake(svc)
+    # human=WHITE, engine=BLACK; create → awaiting_move (белый-человек ходит)
+    g = await _create_game(svc, owner_id=1, human_color="white")
+    g = await svc.submit_move(g.id, user_id=1, point=(8, 8))
+    fake.move = (6, 6)
+    await svc.advance(g)  # движок-чёрный ходит → awaiting_move, есть что откатить
+    with pytest.raises(UndoRejected):
+        await svc.undo(g.id, user_id=1)  # отклонён: undo_enabled=False
+
+
+async def test_undo_respects_policy_limit():
+    """Если undo_limit=1, второй undo должен отклоняться."""
+    import pytest
+
+    from app.domain.errors import UndoRejected
+    from app.models.user_settings import UserSettings
+
+    sr = InMemorySettingsRepository()
+    await sr.upsert(
+        UserSettings(
+            user_id=1,
+            games_limit=50,
+            games_limit_enabled=True,
+            undo_enabled=True,
+            undo_limit=1,
+            undo_after_game_end=True,
+        )
+    )
+    svc = _svc(settings_repo=sr)
+    fake = _fake(svc)
+    # human=WHITE, engine=BLACK; create → awaiting_move
+    g = await _create_game(svc, owner_id=1, human_color="white")
+    g = await svc.submit_move(g.id, user_id=1, point=(8, 8))
+    fake.move = (6, 6)
+    await svc.advance(g)  # moves=[[7,7],[8,8],[6,6]], awaiting_move
+
+    await svc.undo(g.id, user_id=1)  # первый undo → ок, undo_count=1
+
+    g = await svc.get_game(g.id, user_id=1)
+    g = await svc.submit_move(g.id, user_id=1, point=(8, 8))
+    fake.move = (5, 5)
+    await svc.advance(g)
+
+    with pytest.raises(UndoRejected):
+        await svc.undo(g.id, user_id=1)  # второй undo → LIMIT_REACHED
 
 
 async def test_undo_resets_finished_at():

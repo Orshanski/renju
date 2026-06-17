@@ -244,8 +244,14 @@ class GameService:
 
     async def undo(self, game_id: str, user_id: int) -> Game:
         game = await self._load_owned(game_id, user_id)
+        settings = await self._settings_repo.get_or_default(user_id)
+        policy = UndoPolicy(
+            enabled=settings.undo_enabled,
+            limit=settings.undo_limit,
+            after_game_end=settings.undo_after_game_end,
+        )
         check_undo(
-            policy=UndoPolicy(),
+            policy=policy,
             status=GameStatus(game.status),
             undo_count=game.undo_count,
         )
