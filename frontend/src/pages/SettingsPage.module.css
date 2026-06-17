@@ -1,5 +1,5 @@
 /* frontend/src/pages/SettingsPage.module.css */
-@value sumi, sumiSoft, sumiFaint, vermillion, vermillionDeep, paper, okGreen, r, rInput, fontSerif, fontSans from "../styles/tokens.module.css";
+@value sumi, sumiSoft, sumiFaint, vermillion, vermillionDeep, paper, okGreen, r, rInput, fontSerif, fontSans, toggleKnob, stepperBtnBg, stepperBtnHover from "../styles/tokens.module.css";
 
 .wrap {
   max-width: 680px;
@@ -82,7 +82,7 @@
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: #fbf6ea;
+  background: toggleKnob;
   transition: left 0.2s;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
@@ -94,6 +94,12 @@
 
 .toggleOn::after {
   left: 25px;
+}
+
+.limitControl {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 /* Stepper */
@@ -110,7 +116,7 @@
   width: 40px;
   height: 40px;
   border: none;
-  background: #f3e9d4;
+  background: stepperBtnBg;
   font-size: 18px;
   cursor: pointer;
   color: sumi;
@@ -118,7 +124,7 @@
 }
 
 .stepperBtn:hover {
-  background: #ecdfc4;
+  background: stepperBtnHover;
 }
 
 .stepperNum {

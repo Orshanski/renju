@@ -174,7 +174,7 @@ export default function SettingsPage() {
             <div className={styles.setrowLabel}>Партий на раздел</div>
             <div className={styles.setrowDesc}>Верхний предел партий в каждом разделе (текущие / завершённые). 10–100.</div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div className={styles.limitControl}>
             <div
               className={draft.games_limit_enabled ? styles.toggleOn : styles.toggle}
               onClick={() => setDraft({ ...draft, games_limit_enabled: !draft.games_limit_enabled })}
