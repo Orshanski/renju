@@ -1,27 +1,11 @@
 /* Каркас страницы админки — по prototype/index.html #screen-admin */
 @value sumi, sumiSoft, sumiFaint, vermillion, paper, washi, washi2, fontSerif, fontSans, r, shadowSm from "../styles/tokens.module.css";
 
-.wrap {
-  max-width: 860px;
-  margin: 0 auto;
-}
+.wrap { composes: wrap from "../styles/layout.module.css"; }
 
-.eyebrow {
-  font-family: fontSans;
-  font-size: 11px;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: sumiFaint;
-  margin-bottom: 6px;
-}
+.eyebrow { composes: eyebrow from "../styles/layout.module.css"; }
 
-.title {
-  font-family: fontSerif;
-  font-size: 28px;
-  font-weight: 700;
-  color: sumi;
-  margin: 0 0 28px;
-}
+.title { composes: title from "../styles/layout.module.css"; margin: 0 0 28px; }
 
 .tabs {
   display: flex;
