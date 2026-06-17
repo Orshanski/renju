@@ -218,6 +218,46 @@ it("событие online переподключает SSE после обрыв
   unmount();
 });
 
+it("сервер лёг и поднялся: сетевая ошибка /me → новый EventSource (реконнект не умер)", async () => {
+  // FakeEventSource не падает автоматически — проверяем один цикл:
+  // onerror → /me сетевая ошибка → connect() → новый EventSource создан (цикл жив).
+  // Второй разрыв → /me 200 → третий EventSource (восстановление).
+  let meCallCount = 0;
+  server.use(
+    http.get("/api/games/g1", () => HttpResponse.json(state())),
+    http.get("/api/auth/me", () => {
+      meCallCount += 1;
+      if (meCallCount === 1) return HttpResponse.error(); // первый вызов — сервер лёг
+      return HttpResponse.json({ id: 1, username: "a", role: "user" });
+    }),
+  );
+  const { result } = renderHook(() => useGame("g1", 0));
+  await waitFor(() => expect(result.current.view).not.toBeNull());
+  act(() => FakeEventSource.last().fail()); // разрыв SSE → /me сетевая ошибка → connect() рекурсивно
+  // после сетевой ошибки /me — connect() создаёт новый EventSource (реконнект не умер)
+  await waitFor(() => expect(FakeEventSource.instances).toHaveLength(2));
+  // теперь второй разрыв → /me 200 → третий EventSource (восстановление)
+  act(() => FakeEventSource.last().fail());
+  await waitFor(() => expect(FakeEventSource.instances).toHaveLength(3));
+  expect(meCallCount).toBe(2); // два вызова /me суммарно
+});
+
+it("сессия отозвана при падении сервера: 401 → реконнект останавливается", async () => {
+  const onUnauthorized = vi.fn();
+  setUnauthorizedHandler(onUnauthorized);
+  server.use(
+    http.get("/api/games/g1", () => HttpResponse.json(state())),
+    http.get("/api/auth/me", () => HttpResponse.json({ detail: "Unauthorized" }, { status: 401 })),
+  );
+  const { result } = renderHook(() => useGame("g1", 0));
+  await waitFor(() => expect(result.current.view).not.toBeNull());
+  act(() => FakeEventSource.last().fail());
+  await waitFor(() => expect(onUnauthorized).toHaveBeenCalled());
+  // дожидаемся стабильности: новый EventSource не должен появляться
+  await new Promise((r) => setTimeout(r, 50));
+  expect(FakeEventSource.instances).toHaveLength(1); // реконнект остановлен
+});
+
 it("presence: enter на mount, leave на unmount (rj-899)", async () => {
   const calls: string[] = [];
   server.use(

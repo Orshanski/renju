@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { apiRequest } from "../api/client";
+import { apiRequest, ApiError } from "../api/client";
 import { enterGame, getGame, leaveGame, postMove, postUndo } from "./api";
 import { canPlay } from "./legality";
 import { applyEvent, fromState, placePending } from "./reducer";
@@ -61,8 +61,12 @@ export function useGame(gameId: string, reconnectDelayMs = 3000) {
               // проверка сессии БЕЗ skipAuthRedirect: отозвана → глобальный 401-редирект,
               // вечный реконнект-цикл исключён (мастер-спека §10)
               await apiRequest("GET", "/api/auth/me");
-            } catch {
-              return; // сессии нет — реконнект не возобновляем
+            } catch (e) {
+              if (e instanceof ApiError && e.status === 401) return; // сессия отозвана — стоп
+              // сетевая ошибка / 5xx: сервер недоступен → продолжаем попытки через connect
+              // (новый EventSource сразу уйдёт в onerror → снова таймер → /me; цикл с паузой)
+              if (aliveRef.current) connect(viewRef.current?.cursor ?? since);
+              return;
             }
             if (aliveRef.current) connect(viewRef.current?.cursor ?? since);
           })();
