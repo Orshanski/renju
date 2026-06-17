@@ -2,35 +2,26 @@
 @value sumi, sumiSoft, sumiFaint, vermillion, vermillionDeep, paper, okGreen, r, rInput, fontSerif, fontSans, toggleKnob, stepperBtnBg, stepperBtnHover from "../styles/tokens.module.css";
 
 .wrap {
-  max-width: 680px;
-  margin: 0 auto;
+  composes: wrap from "../styles/layout.module.css";
   padding: 0 0 48px;
 }
 
 .eyebrow {
-  font-family: fontSans;
-  font-size: 11px;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: sumiFaint;
-  margin-bottom: 6px;
+  composes: eyebrow from "../styles/layout.module.css";
 }
 
 .title {
-  font-family: fontSerif;
-  font-size: 28px;
-  font-weight: 700;
-  color: sumi;
+  composes: title from "../styles/layout.module.css";
   margin: 0 0 28px;
 }
 
 .sectionTitle {
-  font-family: fontSans;
-  font-size: 11px;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: sumiFaint;
+  composes: eyebrow from "../styles/layout.module.css";
   margin: 30px 0 14px;
+}
+
+.passwordBlock .sectionTitle {
+  margin-top: 0;
 }
 
 .settings {
