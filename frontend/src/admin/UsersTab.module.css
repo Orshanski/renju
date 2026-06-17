@@ -1,5 +1,5 @@
 /* Экран «Пользователи» — по prototype/index.html #atab-users */
-@value sumi, sumiSoft, sumiFaint, vermillion, vermillionDeep, paper, okGreen, r, rInput, fontSans from "../styles/tokens.module.css";
+@value sumi, sumiSoft, sumiFaint, vermillion, vermillionDeep, paper, r, rInput, fontSans from "../styles/tokens.module.css";
 
 .header {
   display: flex;

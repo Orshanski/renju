@@ -1,5 +1,5 @@
 /* Экран новой партии — по prototype/index.html §MODAL (.levels/.lvl/.dice); токены — @value. */
-@value sumi, sumiSoft, vermillion, vermillionDeep, indigo, shadowSm, fontSerif, fontSans from "../styles/tokens.module.css";
+@value sumi, vermillionDeep, indigo, shadowSm, fontSerif, fontSans from "../styles/tokens.module.css";
 
 .wrap { composes: wrap from "../styles/layout.module.css"; }
 .eyebrow { composes: eyebrow from "../styles/layout.module.css"; }

@@ -1,5 +1,5 @@
 /* Каркас страницы админки — по prototype/index.html #screen-admin */
-@value sumi, sumiSoft, sumiFaint, vermillion, paper, washi, washi2, fontSerif, fontSans, r, shadowSm from "../styles/tokens.module.css";
+@value sumi, sumiSoft, sumiFaint, vermillion, fontSans from "../styles/tokens.module.css";
 
 .wrap { composes: wrap from "../styles/layout.module.css"; }
 
