@@ -1,6 +1,6 @@
 from typing import Protocol
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.game import Game
@@ -12,6 +12,7 @@ class GameRepository(Protocol):
     async def list_by_owner(self, owner_id: int) -> list[Game]: ...
     async def update(self, game: Game) -> None: ...
     async def delete(self, game_id: str) -> None: ...
+    async def delete_many(self, ids: list[str]) -> None: ...
 
 
 class SqlGameRepository:
@@ -43,6 +44,12 @@ class SqlGameRepository:
             await self._s.delete(obj)
             await self._s.commit()
 
+    async def delete_many(self, ids: list[str]) -> None:
+        if not ids:
+            return
+        await self._s.execute(delete(Game).where(Game.id.in_(ids)))
+        await self._s.commit()
+
 
 class InMemoryGameRepository:
     def __init__(self):
@@ -62,3 +69,7 @@ class InMemoryGameRepository:
 
     async def delete(self, game_id: str) -> None:
         self._d.pop(game_id, None)
+
+    async def delete_many(self, ids: list[str]) -> None:
+        for game_id in ids:
+            self._d.pop(game_id, None)

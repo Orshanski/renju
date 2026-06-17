@@ -302,6 +302,5 @@ class GameService:
         """Удалить все партии пользователя в указанном разделе (current или finished)."""
         games = await self._repo.list_by_owner(user_id)
         ids = [g.id for g in games if game_section(g.status, g.favorite) is section]
-        for game_id in ids:
-            await self._repo.delete(game_id)
+        await self._repo.delete_many(ids)
         return len(ids)

@@ -918,6 +918,87 @@ async def test_undo_respects_policy_after_game_end_disabled():
         await svc.undo("g", user_id=1)  # завершена + after_game_end=False → GAME_FINISHED
 
 
+async def test_bulk_delete_current_only():
+    """bulk_delete(CURRENT) удаляет только текущие партии, не трогает finished и favorite."""
+    from datetime import datetime
+
+    from app.domain.retention import Section
+    from app.models.game import Game
+
+    svc = _svc()
+    now = datetime(2026, 1, 1, 12, 0, 0)
+    ctl = {"black": {"kind": "user", "user_id": 1}, "white": _MASTER_JSON}
+    moves_finished = [[7, 7], [8, 8], [9, 9], [10, 10], [11, 11]]
+
+    # Текущие (CURRENT): awaiting_move + opponent_thinking
+    g_cur1 = Game(
+        id="cur1",
+        owner_id=1,
+        controllers=ctl,
+        moves=[[7, 7]],
+        status="awaiting_move",
+        undo_count=0,
+        forbidden_log={},
+        favorite=False,
+        finished_at=None,
+        created_at=now,
+        updated_at=now,
+    )
+    g_cur2 = Game(
+        id="cur2",
+        owner_id=1,
+        controllers=ctl,
+        moves=[[7, 7], [8, 8]],
+        status="opponent_thinking",
+        undo_count=0,
+        forbidden_log={},
+        favorite=False,
+        finished_at=None,
+        created_at=now,
+        updated_at=now,
+    )
+    # Завершённая (FINISHED)
+    g_fin = Game(
+        id="fin1",
+        owner_id=1,
+        controllers=ctl,
+        moves=moves_finished,
+        status="finished_black",
+        undo_count=0,
+        forbidden_log={},
+        favorite=False,
+        finished_at=now,
+        created_at=now,
+        updated_at=now,
+    )
+    # Избранная (FAVORITE): завершённая + favorite=True
+    g_fav = Game(
+        id="fav1",
+        owner_id=1,
+        controllers=ctl,
+        moves=moves_finished,
+        status="finished_black",
+        undo_count=0,
+        forbidden_log={},
+        favorite=True,
+        finished_at=now,
+        created_at=now,
+        updated_at=now,
+    )
+    await svc._repo.create(g_cur1)
+    await svc._repo.create(g_cur2)
+    await svc._repo.create(g_fin)
+    await svc._repo.create(g_fav)
+
+    count = await svc.bulk_delete(user_id=1, section=Section.CURRENT)
+
+    assert count == 2, f"Expected 2 deleted, got {count}"
+    assert await svc._repo.get("cur1") is None, "cur1 (awaiting_move) должна быть удалена"
+    assert await svc._repo.get("cur2") is None, "cur2 (opponent_thinking) должна быть удалена"
+    assert await svc._repo.get("fin1") is not None, "fin1 (finished) НЕ должна быть удалена"
+    assert await svc._repo.get("fav1") is not None, "fav1 (favorite) НЕ должна быть удалена"
+
+
 async def test_undo_resets_finished_at():
     """Партия доиграна (finished_at проставлен) → undo → finished_at снова None."""
     from datetime import datetime
