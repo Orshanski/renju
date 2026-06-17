@@ -45,7 +45,19 @@ Backend (Python 3.13 / uv), из `backend/`:
   процессов по game_id: `EngineRegistry`, wall-clock kill + respawn + retry-once,
   инкрементальный TAKEBACK/TURN путь).
 - `app/config.py` — настройки (pydantic-settings, env `RENJU_*`).
-- HTTP/FastAPI, БД/SQLite+Alembic, SSE, фронт/PWA — этапы 2–4 (ещё нет).
+- HTTP/FastAPI (роутеры), БД/SQLite+Alembic, SSE, auth (JWT-cookie + `token_epoch`),
+  фронт React/Vite + PWA — **РЕАЛИЗОВАНЫ** (релизы v1.x; настройки, админка). Фронт доставляет
+  бэк (StaticFiles→`dist/`); Vite — только бандлер/тест-раннер, без dev-сервера.
+
+Фронт (`frontend/`, React/TS/Vite, CSS Modules + @value-токены из `src/styles/tokens.module.css`):
+- **Единый визуальный слой — `src/styles/layout.module.css`.** Рамка/типографика/кнопка
+  (`wrap` 1120 / `eyebrow` / `title` / `sub` / `btn`) живут ТАМ; экраны подтягивают через CSS
+  `composes`, НЕ переопределяют. **Одинаковые элементы = ОДИН источник** (общий модуль или React-
+  компонент), НЕ копии по экранам — копии дают дрейф (вся боль v1.2.0 была про это). Изоляция
+  ответственности + компонентность — требование Alexey с начала. Остаток дублей (toggle/field/
+  modal/card/setrow/варианты кнопки) → в компоненты, задача **rj-rga**. Табы намеренно разные — не сводить.
+- CSP — в приложении (`middleware/security_headers.py`); nginx на проде CSP НЕ дублировать
+  (два заголовка → пересечение режет шрифты; ловили). `index.html` — без долгого кеша.
 
 Движок:
 - Внешний GPL-код, **вне git** (`.gitignore: /engine/rapfi/`). В git только наши
@@ -81,3 +93,11 @@ Backend (Python 3.13 / uv), из `backend/`:
   ротацию в приложении НЕ делаем). Конфиг — `logging.basicConfig` в `create_app`.
   Пользовательские данные в логах ОБЯЗАТЕЛЬНО оборачивать `app.logging_utils.safe()`
   (CWE-117, log injection). Отклонённые операции логируем на `WARNING`.
+- **Деплой катит миграции.** `.github/workflows/deploy.yml` делает `uv run alembic upgrade head`
+  перед рестартом — смерженная миграция доезжает до прода ТОЛЬКО через этот шаг, не удалять
+  (без него — 500 на новых колонках; ловили на `user_settings_v2`). Деплой: push в `main` →
+  Actions (`git reset --hard` → `uv sync` → alembic → `vite build` → `systemctl restart renju`).
+- **Прод НЕ долбить автоматизированными пробами** (curl, повторные запросы). Renju живёт на
+  сервере Librarium (за Cloudflare; общий `fail2ban`-jail `librarium-scan` банит IP за скан/
+  повторные неавторизованные `401`). curl-пробами по проду забанили IP Alexey. Для проверок —
+  локальный прогон/браузер, не пулемёт по живому домену.
