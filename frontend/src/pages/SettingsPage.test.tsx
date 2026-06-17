@@ -86,3 +86,29 @@ it("показывает предупреждение про другие уст
   render(<SettingsPage />);
   await screen.findByText(/другие устройства/i);
 });
+
+it("включение лимита (был выключен) требует подтверждения перед сохранением", async () => {
+  vi.mocked(settingsApi.getSettings).mockResolvedValue({
+    ...defaultSettings,
+    games_limit_enabled: false,
+    undo_enabled: false,
+  });
+  render(<SettingsPage />);
+  await screen.findByRole("heading", { name: /Настройки/i });
+  // switch'и при undo off: [undo_enabled, games_limit_enabled] → индекс 1 = лимит партий
+  fireEvent.click(screen.getAllByRole("switch")[1]); // включить лимит
+  fireEvent.click(screen.getByRole("button", { name: /Сохранить/i }));
+  // показан диалог подтверждения, НЕ прямое сохранение
+  expect(screen.getByText(/удалит старейшие партии/i)).toBeInTheDocument();
+  expect(settingsApi.saveSettings).not.toHaveBeenCalled();
+});
+
+it("кнопка пароля disabled пока новый пароль короче 6 символов", async () => {
+  render(<SettingsPage />);
+  await screen.findByRole("heading", { name: /Настройки/i });
+  fireEvent.change(screen.getByLabelText(/Текущий пароль/i), { target: { value: "pw" } });
+  fireEvent.change(screen.getByLabelText(/Новый пароль/i), { target: { value: "123" } });
+  expect(screen.getByRole("button", { name: /Обновить пароль/i })).toBeDisabled();
+  fireEvent.change(screen.getByLabelText(/Новый пароль/i), { target: { value: "123456" } });
+  expect(screen.getByRole("button", { name: /Обновить пароль/i })).not.toBeDisabled();
+});

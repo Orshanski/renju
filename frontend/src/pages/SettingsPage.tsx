@@ -46,10 +46,12 @@ export default function SettingsPage() {
     draft.undo_after_game_end !== settings.undo_after_game_end;
 
   function handleSaveSettings() {
-    if (
+    // Лимит «ужесточается» = он включён И (был выключен ИЛИ число уменьшилось).
+    // Оба случая удаляют партии сверх предела → подтверждаем.
+    const limitTightened =
       draft!.games_limit_enabled &&
-      draft!.games_limit < settings!.games_limit
-    ) {
+      (!settings!.games_limit_enabled || draft!.games_limit < settings!.games_limit);
+    if (limitTightened) {
       setConfirm("save-limit");
     } else {
       doSaveSettings();
@@ -97,8 +99,8 @@ export default function SettingsPage() {
       action: () => doBulkDelete("finished"),
     },
     "save-limit": {
-      title: "Уменьшение лимита",
-      body: "Уменьшение лимита удалит старейшие партии сверх нового предела. Продолжить?",
+      title: "Применить лимит партий",
+      body: "Лимит удалит старейшие партии сверх предела. Продолжить?",
       action: () => { setConfirm(null); doSaveSettings(); },
     },
   };
@@ -234,12 +236,13 @@ export default function SettingsPage() {
         <div className={styles.field}>
           <label htmlFor="new-pw">Новый пароль</label>
           <input id="new-pw" type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} />
+          <span className={styles.hint}>Минимум 6 символов.</span>
         </div>
         <p className={styles.hint}>После смены пароля другие устройства и вкладки будут отключены.</p>
         {pwError && <p className={styles.errMsg}>{pwError}</p>}
         <button
           className={styles.saveBtn}
-          disabled={!curPw || !newPw || savingPw}
+          disabled={!curPw || newPw.length < 6 || savingPw}
           onClick={handleChangePw}
         >
           {savingPw ? "Сохранение…" : "Обновить пароль"}
