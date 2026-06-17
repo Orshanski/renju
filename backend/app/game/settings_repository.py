@@ -2,11 +2,7 @@ from typing import Protocol
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.user_settings import (
-    DEFAULT_CURRENT_LIMIT,
-    DEFAULT_FINISHED_LIMIT,
-    UserSettings,
-)
+from ..models.user_settings import DEFAULT_GAMES_LIMIT, UserSettings
 
 
 class SettingsRepository(Protocol):
@@ -22,14 +18,13 @@ class SqlSettingsRepository:
         obj = await self._s.get(UserSettings, user_id)
         if obj is not None:
             return obj
-        # Транзиентный объект с явными дефолтами из констант — не персистим,
-        # атрибуты доступны сразу без flush/БД.
         return UserSettings(
             user_id=user_id,
-            current_limit=DEFAULT_CURRENT_LIMIT,
-            current_limit_enabled=True,
-            finished_limit=DEFAULT_FINISHED_LIMIT,
-            finished_limit_enabled=True,
+            games_limit=DEFAULT_GAMES_LIMIT,
+            games_limit_enabled=True,
+            undo_enabled=True,
+            undo_limit=None,
+            undo_after_game_end=True,
         )
 
     async def upsert(self, settings: UserSettings) -> None:
@@ -46,10 +41,11 @@ class InMemorySettingsRepository:
             return self._d[user_id]
         return UserSettings(
             user_id=user_id,
-            current_limit=DEFAULT_CURRENT_LIMIT,
-            current_limit_enabled=True,
-            finished_limit=DEFAULT_FINISHED_LIMIT,
-            finished_limit_enabled=True,
+            games_limit=DEFAULT_GAMES_LIMIT,
+            games_limit_enabled=True,
+            undo_enabled=True,
+            undo_limit=None,
+            undo_after_game_end=True,
         )
 
     async def upsert(self, settings: UserSettings) -> None:
