@@ -393,15 +393,10 @@ async def test_finish_sets_finished_at_and_evicts_over_limit():
     from app.models.user_settings import UserSettings
 
     sr = InMemorySettingsRepository()
-    await sr.upsert(
-        UserSettings(
-            user_id=1,
-            current_limit=10,
-            current_limit_enabled=True,
-            finished_limit=2,
-            finished_limit_enabled=True,
-        )
-    )
+    await sr.upsert(UserSettings(
+        user_id=1, games_limit=2, games_limit_enabled=True,
+        undo_enabled=True, undo_limit=None, undo_after_game_end=True,
+    ))
     svc = _svc(settings_repo=sr)
 
     now = datetime(2026, 1, 1, 12, 0, 0)
@@ -486,15 +481,10 @@ async def test_create_evicts_current_over_limit():
     from app.models.user_settings import UserSettings
 
     sr = InMemorySettingsRepository()
-    await sr.upsert(
-        UserSettings(
-            user_id=1,
-            current_limit=2,
-            current_limit_enabled=True,
-            finished_limit=50,
-            finished_limit_enabled=True,
-        )
-    )
+    await sr.upsert(UserSettings(
+        user_id=1, games_limit=2, games_limit_enabled=True,
+        undo_enabled=True, undo_limit=None, undo_after_game_end=True,
+    ))
     svc = _svc(settings_repo=sr)
 
     now = datetime(2026, 1, 1, 12, 0, 0)
@@ -555,15 +545,10 @@ async def test_favorite_only_finished_and_exempt_from_limit():
     from app.models.user_settings import UserSettings
 
     sr = InMemorySettingsRepository()
-    await sr.upsert(
-        UserSettings(
-            user_id=1,
-            current_limit=10,
-            current_limit_enabled=True,
-            finished_limit=1,  # лимит 1: без фаворита — вытеснение
-            finished_limit_enabled=True,
-        )
-    )
+    await sr.upsert(UserSettings(
+        user_id=1, games_limit=1, games_limit_enabled=True,
+        undo_enabled=True, undo_limit=None, undo_after_game_end=True,
+    ))
     svc = _svc(settings_repo=sr)
     now = datetime(2026, 1, 1, 12, 0, 0)
     ctl = {
@@ -655,15 +640,10 @@ async def test_unfavorite_returns_to_finished_and_rechecks_limit():
     from app.models.user_settings import UserSettings
 
     sr = InMemorySettingsRepository()
-    await sr.upsert(
-        UserSettings(
-            user_id=1,
-            current_limit=10,
-            current_limit_enabled=True,
-            finished_limit=1,  # лимит 1 → при возврате из избранного вытеснение
-            finished_limit_enabled=True,
-        )
-    )
+    await sr.upsert(UserSettings(
+        user_id=1, games_limit=1, games_limit_enabled=True,
+        undo_enabled=True, undo_limit=None, undo_after_game_end=True,
+    ))
     svc = _svc(settings_repo=sr)
     now = datetime(2026, 1, 1, 12, 0, 0)
     ctl = {
@@ -741,15 +721,10 @@ async def test_enforce_limits_trims_both_sections():
     from app.models.user_settings import UserSettings
 
     sr = InMemorySettingsRepository()
-    await sr.upsert(
-        UserSettings(
-            user_id=1,
-            current_limit=1,
-            current_limit_enabled=True,
-            finished_limit=1,
-            finished_limit_enabled=True,
-        )
-    )
+    await sr.upsert(UserSettings(
+        user_id=1, games_limit=1, games_limit_enabled=True,
+        undo_enabled=True, undo_limit=None, undo_after_game_end=True,
+    ))
     svc = _svc(settings_repo=sr)
     now = datetime(2026, 1, 1, 12, 0, 0)
     ctl = {

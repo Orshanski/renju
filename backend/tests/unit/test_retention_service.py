@@ -33,10 +33,11 @@ async def test_enforce_limits_evicts_oldest_current():
     await sr.upsert(
         UserSettings(
             user_id=1,
-            current_limit=1,
-            current_limit_enabled=True,
-            finished_limit=50,
-            finished_limit_enabled=True,
+            games_limit=1,
+            games_limit_enabled=True,
+            undo_enabled=True,
+            undo_limit=None,
+            undo_after_game_end=True,
         )
     )
     now = datetime(2026, 1, 1, 12, 0, 0)
