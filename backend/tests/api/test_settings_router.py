@@ -70,6 +70,10 @@ async def test_change_password_wrong_current(app, client):
         },
     )
     assert r.status_code == 400
+    # пароль НЕ изменился: старый всё ещё валиден (перелогин со старым паролем)
+    client.cookies.clear()
+    relogin = await client.post("/api/auth/login", json={"username": "alice", "password": "pw"})
+    assert relogin.status_code == 200
 
 
 async def test_change_password_success_keeps_session(app, client):
