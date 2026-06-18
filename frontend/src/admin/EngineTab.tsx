@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { getEngineConfig, putEngineConfig } from "./admin.api";
+import { depthRange, clampStrength } from "./levelDepth";
 import { ApiError } from "../api/client";
 import styles from "./EngineTab.module.css";
 
-type Row = { id: string; name: string; strength: number; timeoutSec: number };
+type Row = { id: string; name: string; strength: number; timeoutSec: number; depth: number };
 
 export function EngineTab() {
   const [rows, setRows] = useState<Row[] | null>(null);
@@ -17,7 +18,13 @@ export function EngineTab() {
     getEngineConfig()
       .then((c) => {
         if (!alive) return;
-        setRows(c.levels.map((l) => ({ id: l.id, name: l.name, strength: l.strength, timeoutSec: l.timeout_ms / 1000 })));
+        setRows(c.levels.map((l) => ({
+          id: l.id,
+          name: l.name,
+          strength: l.strength,
+          timeoutSec: l.timeout_ms / 1000,
+          depth: l.max_depth,
+        })));
         setNnue(c.nnue);
       })
       .catch(() => alive && setErr("Не удалось загрузить настройки."));
@@ -29,10 +36,21 @@ export function EngineTab() {
     setBusy(true); setSaved(false); setErr(null);
     try {
       const c = await putEngineConfig({
-        levels: rows.map((r) => ({ id: r.id, strength: r.strength, timeout_ms: Math.round(r.timeoutSec * 1000) })),
+        levels: rows.map((r) => ({
+          id: r.id,
+          strength: r.strength,
+          timeout_ms: Math.round(r.timeoutSec * 1000),
+          max_depth: r.depth,
+        })),
         nnue,
       });
-      setRows(c.levels.map((l) => ({ id: l.id, name: l.name, strength: l.strength, timeoutSec: l.timeout_ms / 1000 })));
+      setRows(c.levels.map((l) => ({
+        id: l.id,
+        name: l.name,
+        strength: l.strength,
+        timeoutSec: l.timeout_ms / 1000,
+        depth: l.max_depth,
+      })));
       setNnue(c.nnue);
       setSaved(true);
     } catch (e) {
@@ -46,9 +64,34 @@ export function EngineTab() {
   if (!rows) return <p className={styles.sub}>Загрузка…</p>;
 
   const setRow = (id: string, patch: Partial<Row>) => {
-    setSaved(false); // правка → снять отметку «Сохранено» (иначе висит при несохранённых)
-    setRows((rs) => rs!.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+    setSaved(false);
+    setRows((rs) => {
+      const idx = rs!.findIndex((r) => r.id === id);
+      let next = rs!.map((r) => (r.id === id ? { ...r, ...patch } : r));
+
+      // Зажать силу редактируемой строки соседями
+      if (patch.strength !== undefined) {
+        const strengths = next.map((r) => r.strength);
+        const clamped = clampStrength(idx, patch.strength, strengths);
+        next = next.map((r, k) => (k === idx ? { ...r, strength: clamped } : r));
+      }
+
+      // Каскадный пересчёт глубин сверху вниз: нижняя границы зависит
+      // от ВЫСТАВЛЕННОЙ глубины предыдущего уровня, поэтому идём по порядку.
+      const strengths = next.map((r) => r.strength);
+      const depths = next.map((r) => r.depth);
+      for (let i = 0; i < next.length; i++) {
+        const [lo, hi] = depthRange(i, strengths, depths);
+        depths[i] = Math.min(Math.max(depths[i], lo), hi);
+      }
+      next = next.map((r, k) => (depths[k] !== r.depth ? { ...r, depth: depths[k] } : r));
+
+      return next;
+    });
   };
+
+  const strengths = rows.map((r) => r.strength);
+  const depths = rows.map((r) => r.depth);
 
   return (
     <div>
@@ -58,35 +101,50 @@ export function EngineTab() {
           <tr>
             <th>Уровень</th>
             <th>Сила (0–100)</th>
+            <th>Глубина</th>
             <th>Время на ход, с</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
-            <tr key={r.id}>
-              <td>{r.name}</td>
-              <td>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  aria-label={`${r.name} сила`}
-                  value={r.strength}
-                  onChange={(e) => setRow(r.id, { strength: Number(e.target.value) })}
-                />
-              </td>
-              <td>
-                <input
-                  type="number"
-                  min={0.2}
-                  step={0.5}
-                  aria-label={`${r.name} время`}
-                  value={r.timeoutSec}
-                  onChange={(e) => setRow(r.id, { timeoutSec: Number(e.target.value) })}
-                />
-              </td>
-            </tr>
-          ))}
+          {rows.map((r, i) => {
+            const [lo, hi] = depthRange(i, strengths, depths);
+            return (
+              <tr key={r.id}>
+                <td>{r.name}</td>
+                <td>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    aria-label={`${r.name} сила`}
+                    value={r.strength}
+                    onChange={(e) => setRow(r.id, { strength: Number(e.target.value) })}
+                  />
+                </td>
+                <td>
+                  <input
+                    type="number"
+                    min={lo}
+                    max={hi}
+                    aria-label={`${r.name} глубина`}
+                    value={r.depth}
+                    onChange={(e) => setRow(r.id, { depth: Math.min(Math.max(Number(e.target.value), lo), hi) })}
+                  />
+                  <span className={styles.maxhint}>макс {hi}</span>
+                </td>
+                <td>
+                  <input
+                    type="number"
+                    min={0.2}
+                    step={0.5}
+                    aria-label={`${r.name} время`}
+                    value={r.timeoutSec}
+                    onChange={(e) => setRow(r.id, { timeoutSec: Number(e.target.value) })}
+                  />
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
       <div className={styles.setrow}>

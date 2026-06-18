@@ -1,5 +1,9 @@
+from typing import cast
+
+from app.domain.engine_params import EngineParams
 from app.game.controllers import Engine, User, controller_from_json, controller_to_json
 from app.game.players import EnginePlayer, InteractivePlayer, make_player
+from app.game.ports import EngineAdapter
 
 _MASTER = Engine(level_id="master", strength=90, timeout_ms=6000, nnue=True)
 _NOVICE = Engine(level_id="novice", strength=1, timeout_ms=100, nnue=False)
@@ -16,13 +20,16 @@ async def test_interactive_player_take_turn_none():
 
 
 async def test_make_player_dispatch():
-    from typing import cast
-
-    from app.game.ports import EngineAdapter
-
     fake_adapter = cast(EngineAdapter, object())
     assert isinstance(make_player(User(7), fake_adapter, "g"), InteractivePlayer)
     assert isinstance(make_player(_MASTER, fake_adapter, "g"), EnginePlayer)
+
+
+def test_make_player_passes_max_depth():
+    eng = Engine(level_id="easy", strength=15, timeout_ms=1500, nnue=True, max_depth=6)
+    player = make_player(eng, cast(EngineAdapter, object()), "g1")
+    assert isinstance(player, EnginePlayer)
+    assert player._params == EngineParams(strength=15, timeout_turn_ms=1500, max_depth=6)
 
 
 async def test_engine_player_passes_game_id():

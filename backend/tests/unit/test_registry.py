@@ -46,6 +46,7 @@ class FakeProc:
         return self._script.pop(0)
 
     async def terminate(self, *, grace_s):
+        del grace_s
         self._alive = False
 
 
@@ -395,6 +396,7 @@ async def test_undo_to_first_move_then_engine_thinks_on_current_board():
         "YXHASHCLEAR",
         "INFO strength 50",
         "INFO timeout_turn 200",
+        "INFO max_depth 99",
         "YXNBEST 1",
     ]
     assert reg._slots["g"].synced == [(7, 7), (9, 9)]

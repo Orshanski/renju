@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..auth import CurrentUser, require_admin
 from ..config_repository import ConfigRepository
 from ..db.deps import get_session
+from ..domain.levels_depth import depth_ceiling
 from ..dtos.auth import UserAdminDTO
 from ..dtos.engine_config import EngineConfigBody, EngineConfigDTO, LevelConfigDTO
 from ..services import admin_service
@@ -93,7 +94,14 @@ async def reset_password(
 def _build_engine_config_dto(levels: list, nnue: bool) -> EngineConfigDTO:
     return EngineConfigDTO(
         levels=[
-            LevelConfigDTO(id=lv.id, name=lv.name, strength=lv.strength, timeout_ms=lv.timeout_ms)
+            LevelConfigDTO(
+                id=lv.id,
+                name=lv.name,
+                strength=lv.strength,
+                timeout_ms=lv.timeout_ms,
+                max_depth=lv.max_depth,
+                depth_ceiling=depth_ceiling(lv.strength),
+            )
             for lv in levels
         ],
         nnue=nnue,

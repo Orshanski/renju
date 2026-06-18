@@ -7,6 +7,7 @@ class Engine:
     strength: int
     timeout_ms: int
     nnue: bool
+    max_depth: int = 99  # глубина поиска, 1..99 (заморожена в партию)
 
 
 @dataclass(frozen=True)
@@ -25,13 +26,16 @@ def controller_to_json(c: Controller) -> dict:
             "strength": c.strength,
             "timeout_ms": c.timeout_ms,
             "nnue": c.nnue,
+            "max_depth": c.max_depth,
         }
     return {"kind": "user", "user_id": c.user_id}
 
 
 def controller_from_json(d: dict) -> Controller:
     if d["kind"] == "engine":
-        return Engine(d["level_id"], d["strength"], d["timeout_ms"], d["nnue"])
+        return Engine(
+            d["level_id"], d["strength"], d["timeout_ms"], d["nnue"], d.get("max_depth", 99)
+        )
     return User(d["user_id"])
 
 

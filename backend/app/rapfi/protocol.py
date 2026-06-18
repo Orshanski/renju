@@ -99,8 +99,14 @@ def plan_sync(synced: Sequence[Point] | None, target: Sequence[Point]) -> SyncPl
 
 
 def tunable_commands(params: EngineParams) -> list[str]:
-    """Per-move INFO (сила/время). Шлём перед каждым расчётом."""
-    return [f"INFO strength {params.strength}", f"INFO timeout_turn {params.timeout_turn_ms}"]
+    """Per-move INFO (сила/время/глубина). Шлём перед каждым расчётом.
+
+    max_depth — обычный int 1..99, в stdin движка только проверенный int (анти-инъекция)."""
+    return [
+        f"INFO strength {params.strength}",
+        f"INFO timeout_turn {params.timeout_turn_ms}",
+        f"INFO max_depth {params.max_depth}",
+    ]
 
 
 def turn_commands(point: Point) -> list[str]:

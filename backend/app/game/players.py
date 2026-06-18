@@ -47,5 +47,7 @@ def make_player(ctl: Controller, adapter: EngineAdapter, game_id: str) -> Player
         return InteractivePlayer(ctl.user_id)  # game_id игнорируется (ход придёт подачей)
     assert isinstance(ctl, Engine)
     # Параметры берём из замороженного снимка контроллера, не из глобального словаря уровней
-    params = EngineParams(strength=ctl.strength, timeout_turn_ms=ctl.timeout_ms)
+    params = EngineParams(
+        strength=ctl.strength, timeout_turn_ms=ctl.timeout_ms, max_depth=ctl.max_depth
+    )
     return EnginePlayer(adapter, params, game_id, level_tag=ctl.level_id, nnue=ctl.nnue)
