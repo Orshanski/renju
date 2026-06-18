@@ -517,3 +517,20 @@ async def test_config_lifecycle_assemble_delete_regenerate(rapfi_paths, tmp_path
         )
     finally:
         await reg.close()
+
+
+# ---------------------------------------------------------------------------
+# rj-23r: глубина поиска как параметр уровня (max_depth)
+# ---------------------------------------------------------------------------
+
+
+async def test_compute_move_with_max_depth_returns_legal_move(rapfi_paths):
+    reg = _reg(rapfi_paths)
+    try:
+        params = EngineParams(strength=100, timeout_turn_ms=2000, max_depth=2)
+        moves = [(7, 7), (7, 8), (8, 8), (6, 8)]  # позиция, ход чёрных
+        mv = await reg.compute_move("g-depth", moves, params, level_tag="test")
+        assert mv not in {tuple(m) for m in moves}
+        assert 0 <= mv[0] < BOARD_SIZE and 0 <= mv[1] < BOARD_SIZE
+    finally:
+        await reg.close()
