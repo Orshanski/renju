@@ -130,7 +130,7 @@ export function EngineTab() {
                     value={r.depth}
                     onChange={(e) => setRow(r.id, { depth: Math.min(Math.max(Number(e.target.value), lo), hi) })}
                   />
-                  <span className={styles.desc}>макс {hi}</span>
+                  <span className={styles.maxhint}>макс {hi}</span>
                 </td>
                 <td>
                   <input

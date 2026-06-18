@@ -78,6 +78,11 @@
   color: sumiFaint;
 }
 
+.maxhint {
+  composes: desc;
+  margin-left: 10px;
+}
+
 /* тумблер NNUE */
 .toggle {
   width: 48px;
