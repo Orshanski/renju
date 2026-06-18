@@ -56,6 +56,7 @@ async def create_game(
         strength=level.strength,
         timeout_ms=level.timeout_ms,
         nnue=nnue,
+        max_depth=level.max_depth,
     )
     human = random.choice(["black", "white"])
     game = await service.create_game(

@@ -59,5 +59,25 @@ def test_engine_carries_frozen_config():
         "strength": 90,
         "timeout_ms": 6000,
         "nnue": True,
+        "max_depth": 99,
     }
     assert controller_from_json(j) == e
+
+
+def test_engine_roundtrip_with_max_depth():
+    eng = Engine(level_id="novice", strength=5, timeout_ms=1000, nnue=True, max_depth=3)
+    assert controller_from_json(controller_to_json(eng)) == eng
+
+
+def test_controller_from_json_missing_max_depth_defaults_99():
+    # старая партия без ключа (недомигрированная) — не падает
+    legacy = {
+        "kind": "engine",
+        "level_id": "novice",
+        "strength": 5,
+        "timeout_ms": 1000,
+        "nnue": True,
+    }
+    eng = controller_from_json(legacy)
+    assert isinstance(eng, Engine)
+    assert eng.max_depth == 99
