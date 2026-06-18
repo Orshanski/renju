@@ -119,11 +119,13 @@ class _FakeAdapter:
     """Фейк-движок для юнит-API: ходит в ПЕРВУЮ свободную клетку зоны (без коллизий в advance)."""
 
     async def forbidden_points(self, game_id, moves, *, level_tag="-", nnue=None):
+        del game_id, moves, level_tag, nnue
         return []
 
     async def compute_move(
         self, game_id, moves, params, allowed_zone=None, *, level_tag="-", nnue=None
     ):
+        del game_id, params, level_tag, nnue
         occupied = {tuple(m) for m in moves}
         cells = (
             sorted(allowed_zone) if allowed_zone else [(x, y) for x in range(15) for y in range(15)]
@@ -134,19 +136,19 @@ class _FakeAdapter:
         raise AssertionError("board full")
 
     async def sync_after_undo(self, game_id, moves):
-        pass
+        del game_id, moves
 
     async def mark_present(self, game_id, level_tag="-", *, nnue=None):
-        pass
+        del game_id, level_tag, nnue
 
     async def mark_absent(self, game_id, *, reason="leave"):
-        pass
+        del game_id, reason
 
     async def sweep_once(self):
         pass
 
     async def release(self, game_id, *, reason="delete"):
-        pass
+        del game_id, reason
 
     async def close(self):
         pass

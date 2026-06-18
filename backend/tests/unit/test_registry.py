@@ -46,6 +46,7 @@ class FakeProc:
         return self._script.pop(0)
 
     async def terminate(self, *, grace_s):
+        del grace_s
         self._alive = False
 
 
