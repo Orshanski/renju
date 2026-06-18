@@ -181,7 +181,8 @@ def test_alembic_seeds_level_max_depth(tmp_path, monkeypatch):
     assert r.returncode == 0, r.stderr
     eng = create_engine(f"sqlite:///{tmp_path / 'db.sqlite'}")
     with eng.connect() as conn:
-        rows = dict(conn.execute(text("SELECT id, max_depth FROM levels")).fetchall())
+        result = conn.execute(text("SELECT id, max_depth FROM levels")).fetchall()
+        rows = {r[0]: r[1] for r in result}
     eng.dispose()
     # Бог: дефолт-старт = depth_ceiling(100)
     assert rows["novice"] == 4 and rows["master"] == 15 and rows["god"] == 16
@@ -231,6 +232,7 @@ def test_backfill_games_max_depth_from_frozen_strength(tmp_path, monkeypatch):
     with eng2.connect() as conn:
         row = conn.execute(text("SELECT controllers FROM games WHERE id='g1'")).fetchone()
     eng2.dispose()
+    assert row is not None
     assert json.loads(row[0])["white"]["max_depth"] == 15
 
 
