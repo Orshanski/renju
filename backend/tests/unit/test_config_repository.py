@@ -3,6 +3,7 @@
 import pytest
 
 from app.config_repository import ConfigRepository
+from app.dtos.engine_config import LevelUpdate
 
 
 @pytest.mark.asyncio
@@ -52,3 +53,18 @@ async def test_config_repository_get_level_missing(session):
 
     repo = ConfigRepository(session)
     assert await repo.get_level("nonexistent") is None
+
+
+@pytest.mark.asyncio
+async def test_update_writes_max_depth(session):
+    from tests.conftest import _seed_levels
+
+    await _seed_levels(session)
+    repo = ConfigRepository(session)
+    await repo.update(
+        [LevelUpdate(id="novice", strength=5, timeout_ms=1000, max_depth=2)], nnue=True
+    )
+    await session.commit()
+    lv = await repo.get_level("novice")
+    assert lv is not None
+    assert lv.max_depth == 2

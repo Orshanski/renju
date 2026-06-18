@@ -55,5 +55,6 @@ class ConfigRepository:
             level = level_map[lu.id]
             level.strength = lu.strength
             level.timeout_ms = lu.timeout_ms
+            level.max_depth = lu.max_depth
 
         await self._set_nnue(nnue)

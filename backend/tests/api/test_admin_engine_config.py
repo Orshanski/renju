@@ -8,6 +8,17 @@ async def _login_admin(app, client, username="admin", password="pw"):
     await client.post("/api/auth/login", json={"username": username, "password": password})
 
 
+async def test_get_engine_config_returns_max_depth_and_ceiling(app, client):
+    """GET отдаёт max_depth и depth_ceiling для каждого уровня."""
+    await _login_admin(app, client)
+    levels = (await client.get("/api/admin/engine-config")).json()["levels"]
+    novice = next(lv for lv in levels if lv["id"] == "novice")
+    assert novice["max_depth"] == 4  # сид = depth_ceiling(5)
+    assert novice["depth_ceiling"] == 4
+    god = next(lv for lv in levels if lv["id"] == "god")
+    assert god["depth_ceiling"] == 16  # depth_ceiling(100)
+
+
 async def test_get_engine_config_admin(app, client):
     """GET /api/admin/engine-config — 200, отдаёт levels + nnue."""
     await _login_admin(app, client)
@@ -34,8 +45,8 @@ async def test_put_engine_config_updates(app, client):
         "/api/admin/engine-config",
         json={
             "levels": [
-                {"id": "novice", "strength": 3, "timeout_ms": 800},
-                {"id": "god", "strength": 99, "timeout_ms": 6500},
+                {"id": "novice", "strength": 3, "timeout_ms": 800, "max_depth": 4},
+                {"id": "god", "strength": 99, "timeout_ms": 6500, "max_depth": 16},
             ],
             "nnue": False,
         },
@@ -103,7 +114,10 @@ async def test_put_invalid_strength_422(app, client):
     await _login_admin(app, client)
     r = await client.put(
         "/api/admin/engine-config",
-        json={"levels": [{"id": "novice", "strength": 101, "timeout_ms": 1000}], "nnue": True},
+        json={
+            "levels": [{"id": "novice", "strength": 101, "timeout_ms": 1000, "max_depth": 4}],
+            "nnue": True,
+        },
     )
     assert r.status_code == 422
 
@@ -113,7 +127,10 @@ async def test_put_invalid_strength_negative_422(app, client):
     await _login_admin(app, client)
     r = await client.put(
         "/api/admin/engine-config",
-        json={"levels": [{"id": "novice", "strength": -1, "timeout_ms": 1000}], "nnue": True},
+        json={
+            "levels": [{"id": "novice", "strength": -1, "timeout_ms": 1000, "max_depth": 4}],
+            "nnue": True,
+        },
     )
     assert r.status_code == 422
 
@@ -123,7 +140,10 @@ async def test_put_invalid_timeout_too_low_422(app, client):
     await _login_admin(app, client)
     r = await client.put(
         "/api/admin/engine-config",
-        json={"levels": [{"id": "novice", "strength": 5, "timeout_ms": 199}], "nnue": True},
+        json={
+            "levels": [{"id": "novice", "strength": 5, "timeout_ms": 199, "max_depth": 4}],
+            "nnue": True,
+        },
     )
     assert r.status_code == 422
 
@@ -133,7 +153,10 @@ async def test_put_invalid_timeout_too_high_422(app, client):
     await _login_admin(app, client)
     r = await client.put(
         "/api/admin/engine-config",
-        json={"levels": [{"id": "novice", "strength": 5, "timeout_ms": 30001}], "nnue": True},
+        json={
+            "levels": [{"id": "novice", "strength": 5, "timeout_ms": 30001, "max_depth": 4}],
+            "nnue": True,
+        },
     )
     assert r.status_code == 422
 
@@ -164,8 +187,9 @@ async def test_put_atomicity_unknown_id_rolls_back_valid(app, client):
         "/api/admin/engine-config",
         json={
             "levels": [
-                {"id": "novice", "strength": 77, "timeout_ms": 1234},  # валидный
-                {"id": "does_not_exist", "strength": 10, "timeout_ms": 1000},  # невалидный
+                {"id": "novice", "strength": 77, "timeout_ms": 1234, "max_depth": 4},  # валидный
+                # невалидный id
+                {"id": "does_not_exist", "strength": 10, "timeout_ms": 1000, "max_depth": 4},
             ],
             "nnue": True,
         },
