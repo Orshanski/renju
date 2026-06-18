@@ -13,6 +13,7 @@ class Level(Base):
     ordering: Mapped[int]  # порядок показа (слабый→сильный)
     strength: Mapped[int]  # INFO strength 0..100
     timeout_ms: Mapped[int]  # INFO timeout_turn, мс
+    max_depth: Mapped[int]  # INFO max_depth, 1..99; верх диапазона = depth_ceiling(strength)
 
 
 class EngineSettings(Base):

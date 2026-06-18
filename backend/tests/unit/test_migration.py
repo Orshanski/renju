@@ -175,6 +175,65 @@ def test_backfill_user_settings_v2(tmp_path, monkeypatch):
     assert row[3] == 1  # undo_after_game_end default
 
 
+def test_alembic_seeds_level_max_depth(tmp_path, monkeypatch):
+    monkeypatch.setenv("RENJU_DATA_DIR", str(tmp_path))
+    r = subprocess.run(["uv", "run", "alembic", "upgrade", "head"], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    eng = create_engine(f"sqlite:///{tmp_path / 'db.sqlite'}")
+    with eng.connect() as conn:
+        rows = dict(conn.execute(text("SELECT id, max_depth FROM levels")).fetchall())
+    eng.dispose()
+    # Бог: дефолт-старт = depth_ceiling(100)
+    assert rows["novice"] == 4 and rows["master"] == 15 and rows["god"] == 16
+
+
+def test_backfill_games_max_depth_from_frozen_strength(tmp_path, monkeypatch):
+    """max_depth дописывается в engine-сторону от ЗАМОРОЖЕННОЙ силы партии (не текущей)."""
+    monkeypatch.setenv("RENJU_DATA_DIR", str(tmp_path))
+    # 1) схема ДО нашей миграции = её down_revision
+    r = subprocess.run(
+        ["uv", "run", "alembic", "upgrade", "67237272bf40"], capture_output=True, text=True
+    )
+    assert r.returncode == 0, r.stderr
+    # 2) партия со старым engine-ctl (strength есть, max_depth нет)
+    eng = create_engine(f"sqlite:///{tmp_path / 'db.sqlite'}")
+    ctl = {
+        "black": {"kind": "user", "user_id": 1},
+        "white": {
+            "kind": "engine",
+            "level_id": "master",
+            "strength": 90,
+            "timeout_ms": 6000,
+            "nnue": True,
+        },
+    }
+    with eng.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO users (id, username, password_hash, role, token_epoch) "
+                "VALUES (1, 'alice', 'x', 'user', 0)"
+            )
+        )
+        conn.execute(
+            text(
+                "INSERT INTO games (id, owner_id, controllers, moves, status, undo_count, "
+                "forbidden_log, favorite, finished_at) VALUES "
+                "('g1', 1, :c, '[[7,7]]', 'awaiting_move', 0, '{}', 0, NULL)"
+            ),
+            {"c": json.dumps(ctl)},
+        )
+    eng.dispose()
+    # 3) накатить нашу миграцию
+    r2 = subprocess.run(["uv", "run", "alembic", "upgrade", "head"], capture_output=True, text=True)
+    assert r2.returncode == 0, r2.stderr
+    # 4) max_depth = depth_ceiling(90) = 15 (от замороженной силы партии)
+    eng2 = create_engine(f"sqlite:///{tmp_path / 'db.sqlite'}")
+    with eng2.connect() as conn:
+        row = conn.execute(text("SELECT controllers FROM games WHERE id='g1'")).fetchone()
+    eng2.dispose()
+    assert json.loads(row[0])["white"]["max_depth"] == 15
+
+
 def test_backfill_unresolvable_level_uses_novice(tmp_path, monkeypatch):
     """engine с неизвестным/'-' уровнем → конфиг НОВИЧКА (через засеянный конфиг), а не
     пропуск: партия не остаётся без снимка, иначе строгий загрузчик уронил бы список."""
