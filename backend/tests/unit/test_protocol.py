@@ -84,6 +84,7 @@ def test_init_commands():
         "INFO rule 4",
         "INFO strength 55",
         "INFO timeout_turn 2500",
+        "INFO max_depth 99",
     ]
 
 
@@ -172,7 +173,19 @@ def test_tunable_commands_per_move_info():
     assert tunable_commands(EngineParams(strength=7, timeout_turn_ms=1500)) == [
         "INFO strength 7",
         "INFO timeout_turn 1500",
+        "INFO max_depth 99",
     ]
+
+
+def test_tunable_commands_includes_max_depth():
+    cmds = tunable_commands(EngineParams(strength=5, timeout_turn_ms=1000, max_depth=2))
+    assert cmds == ["INFO strength 5", "INFO timeout_turn 1000", "INFO max_depth 2"]
+
+
+def test_engine_params_max_depth_defaults_to_99():
+    p = EngineParams(strength=5, timeout_turn_ms=1000)
+    assert p.max_depth == 99
+    assert tunable_commands(p)[-1] == "INFO max_depth 99"
 
 
 def test_turn_command_format():

@@ -44,6 +44,7 @@ def test_incremental_no_zone_takeback_then_turn():
         "YXHASHCLEAR",
         "INFO strength 5",
         "INFO timeout_turn 1000",
+        "INFO max_depth 99",
         "TURN 9,9",
     ]
 
@@ -58,6 +59,7 @@ def test_incremental_no_turn_uses_yxnbest_on_current_board():
         "YXHASHCLEAR",
         "INFO strength 5",
         "INFO timeout_turn 1000",
+        "INFO max_depth 99",
         "YXNBEST 1",
     ]
 
