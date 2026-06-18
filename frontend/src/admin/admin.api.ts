@@ -1,9 +1,12 @@
 import { apiRequest } from "../api/client";
 
-export type LevelConfigDTO = { id: string; name: string; strength: number; timeout_ms: number };
+export type LevelConfigDTO = {
+  id: string; name: string; strength: number; timeout_ms: number;
+  max_depth: number; depth_ceiling: number;
+};
 export type EngineConfigDTO = { levels: LevelConfigDTO[]; nnue: boolean };
 export type EngineConfigUpdate = {
-  levels: { id: string; strength: number; timeout_ms: number }[];
+  levels: { id: string; strength: number; timeout_ms: number; max_depth: number }[];
   nnue: boolean;
 };
 

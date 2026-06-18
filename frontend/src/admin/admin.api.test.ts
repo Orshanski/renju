@@ -18,8 +18,8 @@ it("putEngineConfig шлёт тело и возвращает обновлённ
     body = await request.json();
     return HttpResponse.json({ levels: [{ id: "novice", name: "Новичок", strength: 9, timeout_ms: 2000 }], nnue: false });
   }));
-  const updated = await putEngineConfig({ levels: [{ id: "novice", strength: 9, timeout_ms: 2000 }], nnue: false });
-  expect(body).toEqual({ levels: [{ id: "novice", strength: 9, timeout_ms: 2000 }], nnue: false });
+  const updated = await putEngineConfig({ levels: [{ id: "novice", strength: 9, timeout_ms: 2000, max_depth: 5 }], nnue: false });
+  expect(body).toEqual({ levels: [{ id: "novice", strength: 9, timeout_ms: 2000, max_depth: 5 }], nnue: false });
   expect(updated.levels[0].strength).toBe(9);
   expect(updated.nnue).toBe(false);
 });
