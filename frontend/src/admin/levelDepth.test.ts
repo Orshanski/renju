@@ -11,12 +11,17 @@ describe("depthCeiling — копия формулы движка, сверка 
   it.each(table)("s=%i → %i", (s, d) => expect(depthCeiling(s)).toBe(d));
 });
 
-describe("depthRange — [нижняя…верхняя], нижняя=верх предыдущего, Бог особый", () => {
-  it("Новичок: [1 … 4]", () => expect(depthRange(0, [5, 15])).toEqual([1, 4]));
-  it("средний уровень: [верх пред … потолок]", () =>
-    expect(depthRange(1, [5, 15, 35])).toEqual([4, 6]));
-  it("Бог (последний, сила 100): [16 … 99]", () =>
-    expect(depthRange(6, [5, 15, 35, 55, 75, 90, 100])).toEqual([16, 99]));
+describe("depthRange — [нижняя…верхняя], нижняя=ВЫСТАВЛЕННАЯ глубина предыдущего, Бог особый", () => {
+  it("Новичок (index=0): нижняя=1, верх=depthCeiling(5)=4 → [1, 4]", () =>
+    expect(depthRange(0, [5, 15], [4, 6])).toEqual([1, 4]));
+  it("Лёгкий при выставленной глубине Новичка=1: нижняя=1, верх=depthCeiling(15)=6 → [1, 6]", () =>
+    expect(depthRange(1, [5, 15, 35], [1, 6, 9])).toEqual([1, 6]));
+  it("Лёгкий при выставленной глубине Новичка=4: нижняя=4, верх=depthCeiling(15)=6 → [4, 6]", () =>
+    expect(depthRange(1, [5, 15, 35], [4, 6, 9])).toEqual([4, 6]));
+  it("средний уровень: strengths=[1,3] depths=[1,?] → depthRange(1)=[1,4]", () =>
+    expect(depthRange(1, [1, 3], [1, 4])).toEqual([1, 4]));
+  it("Бог (strength=100): верх=99, нижняя=глубина предыдущего", () =>
+    expect(depthRange(6, [5, 15, 35, 55, 75, 90, 100], [4, 6, 9, 11, 13, 15, 16])).toEqual([15, 99]));
 });
 
 describe("clampStrength — зажим силы соседями", () => {

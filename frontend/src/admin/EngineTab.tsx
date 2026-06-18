@@ -68,20 +68,30 @@ export function EngineTab() {
     setRows((rs) => {
       const idx = rs!.findIndex((r) => r.id === id);
       let next = rs!.map((r) => (r.id === id ? { ...r, ...patch } : r));
+
+      // Зажать силу редактируемой строки соседями
       if (patch.strength !== undefined) {
         const strengths = next.map((r) => r.strength);
         const clamped = clampStrength(idx, patch.strength, strengths);
-        strengths[idx] = clamped;
-        const [, hi] = depthRange(idx, strengths);
-        next = next.map((r, k) =>
-          k === idx ? { ...r, strength: clamped, depth: Math.min(r.depth, hi) } : r,
-        );
+        next = next.map((r, k) => (k === idx ? { ...r, strength: clamped } : r));
       }
+
+      // Каскадный пересчёт глубин сверху вниз: нижняя границы зависит
+      // от ВЫСТАВЛЕННОЙ глубины предыдущего уровня, поэтому идём по порядку.
+      const strengths = next.map((r) => r.strength);
+      const depths = next.map((r) => r.depth);
+      for (let i = 0; i < next.length; i++) {
+        const [lo, hi] = depthRange(i, strengths, depths);
+        depths[i] = Math.min(Math.max(depths[i], lo), hi);
+      }
+      next = next.map((r, k) => (depths[k] !== r.depth ? { ...r, depth: depths[k] } : r));
+
       return next;
     });
   };
 
   const strengths = rows.map((r) => r.strength);
+  const depths = rows.map((r) => r.depth);
 
   return (
     <div>
@@ -97,7 +107,7 @@ export function EngineTab() {
         </thead>
         <tbody>
           {rows.map((r, i) => {
-            const [lo, hi] = depthRange(i, strengths);
+            const [lo, hi] = depthRange(i, strengths, depths);
             return (
               <tr key={r.id}>
                 <td>{r.name}</td>
